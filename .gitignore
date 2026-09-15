@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+dist/
+
+# testing
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# local dev persistence (in-memory repository snapshots)
+.data/
+
+# env files — never commit real secrets.
+# Deny every .env* by default and allow back only the placeholder template, so a
+# new variant (.env.staging, .env.supabase, .env.backup …) cannot be committed
+# by accident. SUPABASE_SERVICE_ROLE_KEY bypasses Row Level Security.
+.env*
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+*.tsbuildinfo
+.vercel
+.idea/
+.vscode/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local editor/agent config
+.claude/

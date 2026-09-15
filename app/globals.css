@@ -1,0 +1,197 @@
+@import 'tailwindcss';
+
+/* Class-based dark mode: the theme script sets `.dark` on <html> before paint. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Palette. Warm neutrals rather than blue-grey, a single restrained accent, and
+ * borders that stay quiet — closer to a terminal utility than a dashboard.
+ */
+:root {
+  --tp-bg: #fbfaf8;
+  --tp-surface: #ffffff;
+  --tp-surface-muted: #f4f2ee;
+  --tp-border: #e2ddd5;
+  --tp-border-strong: #cdc6ba;
+  --tp-text: #1c1a17;
+  --tp-text-muted: #6b6559;
+  --tp-text-subtle: #8d8677;
+  --tp-accent: #b1502f;
+  --tp-accent-hover: #963f22;
+  --tp-accent-soft: #fbeee8;
+  --tp-danger: #b3261e;
+  --tp-danger-soft: #fdecea;
+  --tp-success: #1f6f4a;
+  --tp-success-soft: #e8f4ed;
+  --tp-warning: #8a5a00;
+  --tp-warning-soft: #fdf3dd;
+  --tp-ring: #b1502f;
+  --tp-shadow: 0 1px 2px rgb(28 26 23 / 0.06), 0 8px 24px -16px rgb(28 26 23 / 0.25);
+  color-scheme: light;
+}
+
+.dark {
+  --tp-bg: #101113;
+  --tp-surface: #17181b;
+  --tp-surface-muted: #1e2023;
+  --tp-border: #2a2d31;
+  --tp-border-strong: #3d4146;
+  --tp-text: #e8e6e3;
+  --tp-text-muted: #9b978f;
+  --tp-text-subtle: #7b776f;
+  --tp-accent: #e0855f;
+  --tp-accent-hover: #f0a180;
+  --tp-accent-soft: #2a1d17;
+  --tp-danger: #f08078;
+  --tp-danger-soft: #2c1917;
+  --tp-success: #6bbf92;
+  --tp-success-soft: #14241c;
+  --tp-warning: #e0b055;
+  --tp-warning-soft: #2a2317;
+  --tp-ring: #e0855f;
+  --tp-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -16px rgb(0 0 0 / 0.8);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--tp-bg);
+  --color-surface: var(--tp-surface);
+  --color-surface-muted: var(--tp-surface-muted);
+  --color-border-base: var(--tp-border);
+  --color-border-strong: var(--tp-border-strong);
+  --color-text-base: var(--tp-text);
+  --color-text-muted: var(--tp-text-muted);
+  --color-text-subtle: var(--tp-text-subtle);
+  --color-accent: var(--tp-accent);
+  --color-accent-hover: var(--tp-accent-hover);
+  --color-accent-soft: var(--tp-accent-soft);
+  --color-danger: var(--tp-danger);
+  --color-danger-soft: var(--tp-danger-soft);
+  --color-success: var(--tp-success);
+  --color-success-soft: var(--tp-success-soft);
+  --color-warning: var(--tp-warning);
+  --color-warning-soft: var(--tp-warning-soft);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', 'Cascadia Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+@layer base {
+  * {
+    border-color: var(--tp-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--tp-bg);
+    color: var(--tp-text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One consistent, always-visible focus treatment across the whole app. */
+  :focus-visible {
+    outline: 2px solid var(--tp-ring);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background-color: var(--tp-accent);
+    color: #fff;
+  }
+
+  textarea,
+  input,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* Slim scrollbars keep code panes from feeling like a chrome-heavy widget. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tp-border-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--tp-border-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /* Visible only to assistive technology. */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .tp-shadow {
+    box-shadow: var(--tp-shadow);
+  }
+
+  /*
+   * Shiki emits per-token CSS variables for both themes at once. Rendering the
+   * right one is a pure CSS concern, so no re-highlight is needed on theme change.
+   */
+  .shiki-token {
+    color: var(--shiki-light, inherit);
+  }
+
+  .dark .shiki-token {
+    color: var(--shiki-dark, inherit);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
