@@ -106,6 +106,67 @@ test.describe('deleting', () => {
   });
 });
 
+test.describe('deleting a burned paste', () => {
+  test('the creator can remove the leftover record from the burned screen', async ({ page }) => {
+    const url = await createPaste(page, {
+      content: 'burn then delete',
+      title: 'Leftover',
+      burnAfterRead: true,
+    });
+    const target = recipientUrl(url);
+
+    // Consume it, so the paste becomes unreadable and the viewer no longer renders.
+    await page.goto(target);
+    await page.getByRole('button', { name: /Reveal and destroy/ }).click();
+    await expect(page.locator('pre')).toContainText('burn then delete');
+
+    await page.goto(target);
+    await expect(page.getByRole('heading', { name: 'This paste is no longer available.' })).toBeVisible();
+
+    // The creator's browser holds the edit token, so deletion is offered here.
+    await page.getByRole('button', { name: 'Delete permanently' }).click();
+    await page.getByRole('button', { name: 'Delete paste' }).click();
+    await expect(page.getByText('Deleted. Nothing for this link remains stored.')).toBeVisible();
+
+    // The row is gone, so the state changes from "burned" to "not found".
+    await page.goto(target);
+    await expect(page.getByRole('heading', { name: 'Paste not found.' })).toBeVisible();
+  });
+
+  test('a stranger is not offered deletion on the burned screen', async ({ page, context }) => {
+    const url = await createPaste(page, { content: 'not yours to delete', burnAfterRead: true });
+    const target = recipientUrl(url);
+
+    await page.goto(target);
+    await page.getByRole('button', { name: /Reveal and destroy/ }).click();
+    await expect(page.locator('pre')).toContainText('not yours to delete');
+
+    const stranger = await context.browser()!.newContext();
+    const strangerPage = await stranger.newPage();
+    await strangerPage.goto(target);
+    await expect(
+      strangerPage.getByRole('heading', { name: 'This paste is no longer available.' }),
+    ).toBeVisible();
+    await expect(strangerPage.getByRole('button', { name: 'Delete permanently' })).toHaveCount(0);
+    await stranger.close();
+  });
+
+  test('the API refuses a forged token even though the read gate is bypassed', async ({ page, request }) => {
+    const url = await createPaste(page, { content: 'guarded leftover', burnAfterRead: true });
+    const slug = new URL(url).pathname.split('/')[2];
+
+    await request.post(`/api/pastes/${slug}/reveal`);
+
+    const forged = await request.delete(`/api/pastes/${slug}`, {
+      headers: { 'x-tinypaste-edit-token': 'forged-token-value' },
+    });
+    expect(forged.status()).toBe(403);
+
+    const noToken = await request.delete(`/api/pastes/${slug}`);
+    expect(noToken.status()).toBe(401);
+  });
+});
+
 test.describe('recent pastes', () => {
   test('lists pastes from this browser only', async ({ page, context }) => {
     await createPaste(page, { content: 'mine one', title: 'Mine One' });

@@ -312,6 +312,72 @@ describe('edit token authorisation', () => {
   });
 });
 
+describe('deleting a paste that can no longer be read', () => {
+  /**
+   * Regression: delete used to run through the read gate, so an owner was
+   * rejected with PASTE_BURNED / PASTE_EXPIRED and the row was stranded — for a
+   * burned paste that never expires, permanently, since cleanup only targets
+   * expires_at.
+   */
+  it('deletes a burned paste', async () => {
+    const created = await createPaste(plainInput({ burnAfterRead: true }));
+    await readPasteContent(created.slug, { allowBurn: true });
+    expect((await repo.findBySlug(created.slug))?.burnedAt).not.toBeNull();
+
+    await deletePaste(created.slug, created.editToken);
+    expect(await repo.findBySlug(created.slug)).toBeNull();
+  });
+
+  it('deletes an expired paste', async () => {
+    const created = await createPaste(plainInput({ expiration: '10m' }));
+    await repo.update(created.slug, {
+      title: null,
+      content: 'stranded',
+      encryptedContent: null,
+      encryptionIv: null,
+      encryptionVersion: null,
+      language: 'plaintext',
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      contentSize: 8,
+    });
+    await expectAppError(readPasteContent(created.slug), 'PASTE_EXPIRED');
+
+    await deletePaste(created.slug, created.editToken);
+    expect(await repo.findBySlug(created.slug)).toBeNull();
+  });
+
+  it('still requires a valid edit token when the paste is burned', async () => {
+    const created = await createPaste(plainInput({ burnAfterRead: true }));
+    const other = await createPaste(plainInput());
+    await readPasteContent(created.slug, { allowBurn: true });
+
+    await expectAppError(deletePaste(created.slug, null), 'EDIT_TOKEN_REQUIRED');
+    await expectAppError(deletePaste(created.slug, other.editToken), 'INVALID_EDIT_TOKEN');
+    // Bypassing the read gate must not have bypassed ownership.
+    expect(await repo.findBySlug(created.slug)).not.toBeNull();
+  });
+
+  it('still reports a genuinely missing paste as not found', async () => {
+    await expectAppError(deletePaste('Missing1', 'any-token'), 'PASTE_NOT_FOUND');
+  });
+
+  it('does not let the bypass reach editing', async () => {
+    // Only deletion skips the read gate; editing an unreadable paste stays refused.
+    const created = await createPaste(plainInput({ burnAfterRead: true }));
+    await readPasteContent(created.slug, { allowBurn: true });
+    await expectAppError(
+      updatePaste(created.slug, created.editToken, {
+        isEncrypted: false,
+        content: 'revived',
+        title: null,
+        language: 'plaintext',
+        expiration: '1d',
+      }),
+      'PASTE_BURNED',
+    );
+  });
+});
+
 describe('edit restrictions', () => {
   it('refuses to edit a burn-after-reading paste', async () => {
     const created = await createPaste(plainInput({ burnAfterRead: true }));

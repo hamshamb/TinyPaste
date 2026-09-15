@@ -265,7 +265,7 @@ Precisely defined, because the edge cases matter:
 npm run test
 ```
 
-199 unit tests covering slug generation and validation, expiry arithmetic and boundary conditions,
+225 unit tests covering slug generation and validation, expiry arithmetic and boundary conditions,
 filename sanitisation (traversal, header injection, reserved names), language-to-extension mapping,
 password hashing and verification, edit-token generation and constant-time verification,
 encryption round-trips plus wrong-key/tampered/truncated/version failures, fragment handling, rate
@@ -276,7 +276,7 @@ access control.
 npm run build && npm run test:e2e
 ```
 
-46 Playwright tests covering the create → view → copy/raw/download → fork loop, expiring pastes,
+49 Playwright tests covering the create → view → copy/raw/download → fork loop, expiring pastes,
 password lock and unlock, editing and deleting with a creator token, rejection of forged tokens,
 encrypted paste creation and decryption, missing and wrong keys, burn-after-read semantics including
 a concurrent double-reveal, XSS payload rendering, security headers, and metadata privacy.

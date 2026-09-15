@@ -208,14 +208,44 @@ export async function createPaste(input: CreatePasteInput): Promise<CreatePasteR
   throw new AppError('INTERNAL_ERROR', { message: 'Could not allocate a unique paste link.' });
 }
 
+/** Shared token check. Never trusts a client-side ownership claim. */
+function assertOwner(record: PasteRecord, editToken: string | null | undefined): void {
+  if (!editToken) throw new AppError('EDIT_TOKEN_REQUIRED');
+  if (!verifyEditToken(editToken, record.editTokenHash)) throw new AppError('INVALID_EDIT_TOKEN');
+}
+
 /**
- * Authorise a mutation. Returns the row only when the presented edit token
- * matches the stored hash — a client-side ownership claim is never trusted.
+ * Authorise a mutation that also requires the paste to be readable.
+ *
+ * Goes through loadPasteRecord, so expiry and burn state apply — editing a
+ * paste whose content is gone is meaningless.
  */
 async function authorize(slug: string, editToken: string | null | undefined): Promise<PasteRecord> {
   const record = await loadPasteRecord(slug);
-  if (!editToken) throw new AppError('EDIT_TOKEN_REQUIRED');
-  if (!verifyEditToken(editToken, record.editTokenHash)) throw new AppError('INVALID_EDIT_TOKEN');
+  assertOwner(record, editToken);
+  return record;
+}
+
+/**
+ * Authorise a *destructive* action, bypassing the read gate.
+ *
+ * Expiry and burn state make a paste unreadable, not unowned. Routing deletion
+ * through loadPasteRecord would reject the owner with PASTE_EXPIRED or
+ * PASTE_BURNED before the delete could run, stranding the row — permanently for
+ * a burned paste that never expires, since the cleanup job only targets
+ * expires_at. The row's content is already gone in that state, but its
+ * metadata (notably the title) is not, so the creator must be able to remove it.
+ *
+ * This returns no content, only the row needed to verify the token.
+ */
+async function authorizeDestructive(
+  slug: string,
+  editToken: string | null | undefined,
+): Promise<PasteRecord> {
+  if (!isValidSlug(slug)) throw new AppError('PASTE_NOT_FOUND');
+  const record = await getRepository().findBySlug(slug);
+  if (!record) throw new AppError('PASTE_NOT_FOUND');
+  assertOwner(record, editToken);
   return record;
 }
 
@@ -259,8 +289,12 @@ export async function updatePaste(
   return toMetadata(updated);
 }
 
+/**
+ * Delete a paste. Works in every state, including expired and burned — see
+ * authorizeDestructive for why those must remain deletable by their creator.
+ */
 export async function deletePaste(slug: string, editToken: string | null | undefined): Promise<void> {
-  await authorize(slug, editToken);
+  await authorizeDestructive(slug, editToken);
   const deleted = await getRepository().delete(slug);
   if (!deleted) throw new AppError('PASTE_NOT_FOUND');
 }

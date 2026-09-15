@@ -166,6 +166,12 @@ See the README for the full behavioural specification. The security-relevant poi
   consume.
 - **The payload is nulled**, not just flagged, so a later database leak does not expose a burned
   paste's content.
+- **The creator can still delete a burned paste.** Deletion deliberately bypasses the read gate:
+  expiry and burn state make a paste unreadable, not unowned. Routing it through the gate rejected
+  the owner with `PASTE_BURNED` and stranded the row — permanently for a burn paste set never to
+  expire, since cleanup only targets `expires_at`. The content is already gone in that state, but
+  the title is not. The token check is unchanged, so this widens what an owner can remove, never who
+  can remove it.
 
 ## Rate limiting
 

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { FileQuestion, Flame, TimerOff, TriangleAlert } from 'lucide-react';
+import { OrphanDelete } from '@/components/paste/orphan-delete';
 import type { ErrorCode } from '@/lib/errors';
 
 const STATES: Partial<Record<ErrorCode, { icon: typeof FileQuestion; title: string; detail: string }>> = {
@@ -36,10 +37,18 @@ const FALLBACK = {
   detail: 'The paste could not be loaded. Please try again in a moment.',
 };
 
-/** Shared empty state for every "you cannot see this" outcome. */
-export function PasteErrorState({ code }: { code: ErrorCode }) {
+/**
+ * Shared empty state for every "you cannot see this" outcome.
+ *
+ * `slug` is optional so the not-found case, where no row exists to act on, can
+ * omit it. When present and the paste is merely unreadable rather than gone,
+ * the creator is offered a way to delete the leftover record.
+ */
+export function PasteErrorState({ code, slug }: { code: ErrorCode; slug?: string }) {
   const state = STATES[code] ?? FALLBACK;
   const Icon = state.icon;
+  // A not-found paste has nothing left to delete; these two still have a row.
+  const deletable = slug !== undefined && (code === 'PASTE_EXPIRED' || code === 'PASTE_BURNED');
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center px-4 py-20 text-center">
@@ -54,6 +63,7 @@ export function PasteErrorState({ code }: { code: ErrorCode }) {
       >
         Create a new paste
       </Link>
+      {deletable ? <OrphanDelete slug={slug} /> : null}
     </div>
   );
 }

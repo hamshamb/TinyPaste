@@ -48,6 +48,7 @@ Status key: **Implemented** — working and tested · **Partial** — usable wit
 | Edit a burn-after-read paste | Not supported | Meaningless — the payload is destroyed on first read |
 | Change the security mode by editing | Not supported | Prevents an unrecoverable ciphertext → plaintext downgrade |
 | Delete a paste | Implemented | Confirmation dialog, server-verified token |
+| Delete an expired or burned paste | Implemented | Deletion bypasses the read gate, so a leftover record is never stranded |
 | Recent pastes | Implemented | Per browser; there is no server-side listing API at all |
 | Forget a paste locally | Implemented | Removes the local record without deleting the paste |
 | Clear local history | Implemented | With confirmation |
@@ -108,8 +109,8 @@ Status key: **Implemented** — working and tested · **Partial** — usable wit
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Unit tests | Implemented | 199 tests over slugs, expiry, crypto, filenames, tokens, passwords, validation, rate limiting, headers, repository, service |
-| E2E tests | Implemented | 46 tests over create, view, export, fork, password, burn, encryption, ownership, headers, XSS |
+| Unit tests | Implemented | 225 tests over slugs, expiry, crypto, filenames, tokens, passwords, validation, rate limiting, headers, repository, service |
+| E2E tests | Implemented | 49 tests over create, view, export, fork, password, burn, encryption, ownership, headers, XSS |
 | Burn concurrency | Implemented | 20 simultaneous service claims; 2 simultaneous HTTP reveals |
 | Encryption leak checks | Implemented | Every request URL, body and header asserted free of key and plaintext |
 | Cross-browser E2E | Partial | Chromium only |

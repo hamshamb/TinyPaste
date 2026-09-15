@@ -37,7 +37,7 @@ export default async function PastePage({ params, searchParams }: PageProps) {
   try {
     meta = await getPasteMetadata(slug);
   } catch (error) {
-    return <PasteErrorState code={error instanceof AppError ? error.code : 'INTERNAL_ERROR'} />;
+    return <PasteErrorState code={error instanceof AppError ? error.code : 'INTERNAL_ERROR'} slug={slug} />;
   }
 
   // Password and burn pastes are gated: nothing but metadata is rendered until
@@ -57,7 +57,7 @@ export default async function PastePage({ params, searchParams }: PageProps) {
     body = payload.body;
     resolvedMeta = payload.meta;
   } catch (error) {
-    return <PasteErrorState code={error instanceof AppError ? error.code : 'INTERNAL_ERROR'} />;
+    return <PasteErrorState code={error instanceof AppError ? error.code : 'INTERNAL_ERROR'} slug={slug} />;
   }
 
   return <PasteScreen meta={resolvedMeta} initialBody={body} gate="none" created={created} />;
