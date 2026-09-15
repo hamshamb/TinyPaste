@@ -49,3 +49,8 @@ yarn-error.log*
 
 # Local editor/agent config
 .claude/
+
+# Agent instruction files. `next dev` regenerates these on every run, so they
+# are local scaffolding rather than project source and are never committed.
+AGENTS.md
+CLAUDE.md
