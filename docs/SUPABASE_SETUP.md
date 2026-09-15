@@ -134,6 +134,35 @@ Must be **0**. That is intentional: RLS on with no policies denies every request
 or authenticated key. TinyPaste reaches the table only server-side with the service-role key, which
 bypasses RLS.
 
+Table privileges are a second, independent layer. Confirm `anon` and `authenticated` hold none:
+
+```sql
+select grantee, privilege_type
+  from information_schema.role_table_grants
+ where table_name = 'pastes'
+ order by grantee;
+```
+
+`anon` and `authenticated` must not appear. `service_role` should show SELECT, INSERT, UPDATE and
+DELETE.
+
+Finally, confirm the helper functions are not callable by the browser-facing roles:
+
+```sql
+select p.proname,
+       has_function_privilege('anon',   p.oid, 'execute') as anon_can_execute,
+       has_function_privilege('public', p.oid, 'execute') as public_can_execute,
+       has_function_privilege('service_role', p.oid, 'execute') as service_role_can_execute
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('consume_burn_paste', 'increment_paste_views', 'delete_expired_pastes');
+```
+
+All three rows must read `false, false, true`. If `anon_can_execute` is true, the migration's
+function revokes did not apply — PostgreSQL grants EXECUTE to PUBLIC by default and every role
+inherits it, so a revoke that names only `anon` and `authenticated` silently leaves access in place.
+
 Verify from outside, substituting your project URL and anon key:
 
 ```bash

@@ -32,38 +32,74 @@ create table if not exists public.pastes (
 
   constraint pastes_slug_shape check (slug ~ '^[A-Za-z0-9]{4,16}$'),
   constraint pastes_title_length check (title is null or char_length(title) <= 120),
+  -- A row is either plaintext or ciphertext, never both and never neither.
+  -- The burned_at branches exist because a burn nulls the payload in place;
+  -- an *unburned* row must still carry a complete, usable payload, so a
+  -- half-written encrypted paste cannot be stored.
   constraint pastes_payload_shape check (
-    (is_encrypted = false and encrypted_content is null and encryption_iv is null)
+    (
+      is_encrypted = false
+      and encrypted_content is null
+      and encryption_iv is null
+      and encryption_version is null
+      and (burned_at is not null or content is not null)
+    )
     or
-    -- After a burn the payload columns are nulled, so an encrypted row is
-    -- allowed to have no ciphertext once burned_at is set.
-    (is_encrypted = true and content is null and encryption_version is not null)
+    (
+      is_encrypted = true
+      and content is null
+      and encryption_version is not null
+      and (
+        burned_at is not null
+        or (
+          encrypted_content is not null
+          and encryption_iv is not null
+        )
+      )
+    )
   ),
   -- Version 1 keeps browser encryption and server passwords mutually exclusive.
   constraint pastes_encryption_excludes_password check (
     is_encrypted = false or password_hash is null
-  )
+  ),
+  constraint pastes_content_size_nonnegative check (content_size >= 0),
+  -- Only a burn-after-reading paste can ever be in a burned state.
+  constraint pastes_burn_state check (burned_at is null or burn_after_read = true)
 );
 
--- Slug lookup is the hot path for every read.
-create unique index if not exists pastes_slug_key on public.pastes (slug);
+-- Slug lookup is the hot path for every read; the UNIQUE constraint on `slug`
+-- already provides the index (named pastes_slug_key), so none is created here.
 -- Partial index: the cleanup job only ever scans rows that can actually expire.
 create index if not exists pastes_expires_at_idx
   on public.pastes (expires_at)
   where expires_at is not null;
 
 ------------------------------------------------------------------------------
--- Row Level Security
+-- Row Level Security and table privileges
 --
--- RLS is enabled with no policies, which denies every request made with the
--- anon or authenticated key. The application reaches the table exclusively
--- through server-side routes using the service-role key, which bypasses RLS.
--- The result: a leaked anon key cannot read a single paste.
+-- Two independent layers, because either alone can be undone by a later change:
+--
+--   1. RLS is enabled with no policies, which denies every request made with
+--      the anon or authenticated key.
+--   2. Table privileges are revoked outright, so even if someone later adds a
+--      permissive policy, those roles still hold no SELECT/INSERT/UPDATE/DELETE.
+--
+-- The revoke targets PUBLIC as well as the named roles. Privileges granted to
+-- PUBLIC are inherited by every role, so revoking from anon and authenticated
+-- alone would leave access in place through PUBLIC.
+--
+-- The application reaches the table exclusively through server-side routes
+-- using the service-role key, which both bypasses RLS and is granted explicitly
+-- below. A leaked anon key cannot read a single paste.
 ------------------------------------------------------------------------------
 alter table public.pastes enable row level security;
 alter table public.pastes force row level security;
 
-revoke all on public.pastes from anon, authenticated;
+revoke all on table public.pastes from public, anon, authenticated;
+
+grant select, insert, update, delete
+  on table public.pastes
+  to service_role;
 
 ------------------------------------------------------------------------------
 -- Atomic burn-after-reading claim.
@@ -125,6 +161,10 @@ $$;
 ------------------------------------------------------------------------------
 -- View counter. Best-effort and privacy-preserving: a single integer, with no
 -- IP address, user agent or timestamp recorded anywhere.
+--
+-- The expiry and burn guards mirror the checks the application already makes.
+-- They are not a data-leak defence — this function returns nothing — but they
+-- keep the counter consistent if application code ever calls it out of order.
 ------------------------------------------------------------------------------
 create or replace function public.increment_paste_views(p_slug text)
 returns void
@@ -135,7 +175,9 @@ set search_path = public
 as $$
   update public.pastes
      set views = views + 1
-   where slug = p_slug;
+   where slug = p_slug
+     and burned_at is null
+     and (expires_at is null or expires_at > now());
 $$;
 
 ------------------------------------------------------------------------------
@@ -160,6 +202,29 @@ begin
 end;
 $$;
 
-revoke all on function public.consume_burn_paste(text) from anon, authenticated;
-revoke all on function public.increment_paste_views(text) from anon, authenticated;
-revoke all on function public.delete_expired_pastes() from anon, authenticated;
+------------------------------------------------------------------------------
+-- Function privileges
+--
+-- PostgreSQL grants EXECUTE on a new function to PUBLIC by default, and every
+-- role inherits PUBLIC. Revoking only from anon and authenticated would
+-- therefore leave them able to call these functions through PUBLIC — so the
+-- revoke must name PUBLIC, and service_role must then be granted back
+-- explicitly. Only the privileged TinyPaste server should reach these.
+------------------------------------------------------------------------------
+revoke execute on function public.consume_burn_paste(text)
+  from public, anon, authenticated;
+
+revoke execute on function public.increment_paste_views(text)
+  from public, anon, authenticated;
+
+revoke execute on function public.delete_expired_pastes()
+  from public, anon, authenticated;
+
+grant execute on function public.consume_burn_paste(text)
+  to service_role;
+
+grant execute on function public.increment_paste_views(text)
+  to service_role;
+
+grant execute on function public.delete_expired_pastes()
+  to service_role;

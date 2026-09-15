@@ -209,14 +209,37 @@ and any `process.env` reference inside `components/`.
 ```sql
 alter table public.pastes enable row level security;
 alter table public.pastes force row level security;
-revoke all on public.pastes from anon, authenticated;
+
+revoke all on table public.pastes from public, anon, authenticated;
+grant select, insert, update, delete on table public.pastes to service_role;
 ```
 
 RLS is enabled with **no policies at all**, which denies every request made with the anon or
 authenticated key. The application reaches the table only through server-side routes using the
 service-role key, which bypasses RLS. The consequence: a leaked anon key — the one that legitimately
-ships to browsers in many Supabase apps — cannot read a single paste. The helper functions are
-likewise revoked from both roles.
+ships to browsers in many Supabase apps — cannot read a single paste.
+
+Table privileges are revoked as a **second, independent layer**. RLS alone would be undone by
+anyone who later adds a permissive policy; with the grants removed, those roles still hold no
+`SELECT`/`INSERT`/`UPDATE`/`DELETE` to exercise.
+
+### Why the revokes name PUBLIC
+
+This detail is easy to get wrong. PostgreSQL grants `EXECUTE` on every new function to the `PUBLIC`
+pseudo-role by default, and **every role inherits PUBLIC**. Revoking only from `anon` and
+`authenticated` therefore leaves them able to call the function through PUBLIC — the revoke looks
+correct and changes nothing.
+
+So each function revokes from PUBLIC as well, and `service_role` is granted back explicitly:
+
+```sql
+revoke execute on function public.consume_burn_paste(text) from public, anon, authenticated;
+grant  execute on function public.consume_burn_paste(text) to service_role;
+```
+
+The same applies to `increment_paste_views` and `delete_expired_pastes`. The functions are
+`security invoker`, so a caller without table privileges could not have done damage through them
+anyway — but the intent is now explicit in the schema rather than implied by a second mechanism.
 
 ## Input validation
 

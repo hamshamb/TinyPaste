@@ -25,9 +25,15 @@ blob-report/
 # env files — never commit real secrets.
 # Deny every .env* by default and allow back only the placeholder template, so a
 # new variant (.env.staging, .env.supabase, .env.backup …) cannot be committed
-# by accident. SUPABASE_SERVICE_ROLE_KEY bypasses Row Level Security.
+# by accident. SUPABASE_SERVICE_ROLE_KEY holds the server-side secret key, which
+# bypasses Row Level Security.
 .env*
 !.env.example
+
+# Listed explicitly as well. Both are already covered by the .env* rule above;
+# these are here so the two conventional patterns are greppable in this file.
+.env.local
+.env*.local
 
 # misc
 .DS_Store
