@@ -1,45 +1,52 @@
+import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 
+const SOURCE_WIDTH = 512;
+const SOURCE_HEIGHT = 341;
+
 /**
- * The TinyPaste mark: a prompt caret and a cursor rule inside a soft square.
+ * The supplied Affinity previews include an opaque white artboard around the
+ * page-shaped mark. The clip follows that page silhouette, while the oversized
+ * source image is positioned so the clipped artwork fills this compact header
+ * slot without modifying or regenerating the original logo.
+ */
+const LOGO_CLIP = 'polygon(28.5% 12%, 51.5% 12%, 67.8% 45%, 67.8% 88%, 28.5% 88%)';
+
+function LogoAsset({ src, className }: { src: string; className: string }) {
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={SOURCE_WIDTH}
+      height={SOURCE_HEIGHT}
+      draggable={false}
+      className={cn('absolute max-w-none select-none', className)}
+      style={{
+        width: 62,
+        height: 'auto',
+        left: -18,
+        top: -5,
+        clipPath: LOGO_CLIP,
+      }}
+    />
+  );
+}
+
+/**
+ * Theme-aware TinyPaste mark.
  *
- * Deliberately geometric and tiny — it has to hold up at 20px in a header and
- * read as a tool, not as an illustration. It draws from the palette variables
- * so it recolours with the theme without a second asset.
+ * The dark artwork is used against the light UI; the light/purple artwork is
+ * used against the dark UI. Theme selection follows the app's `.dark` class,
+ * so an explicit preference wins over the operating-system preference.
  */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-      focusable="false"
-      className={cn('h-[22px] w-[22px] shrink-0', className)}
+    <span
+      aria-hidden="true"
+      className={cn('relative block h-8 w-6 shrink-0 overflow-hidden', className)}
     >
-      <rect
-        x="0.75"
-        y="0.75"
-        width="22.5"
-        height="22.5"
-        rx="6.75"
-        fill="var(--tp-accent-soft)"
-        stroke="var(--tp-accent-line)"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M7.6 8.4 10.9 12l-3.3 3.6"
-        stroke="var(--tp-accent)"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13.2 15.6h3.4"
-        stroke="var(--tp-accent)"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        opacity="0.65"
-      />
-    </svg>
+      <LogoAsset src="/brand/tinypaste-logo-dark.png" className="block dark:hidden" />
+      <LogoAsset src="/brand/tinypaste-logo-light.png" className="hidden dark:block" />
+    </span>
   );
 }

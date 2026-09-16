@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/tinypaste-logo-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/assets/tinypaste-logo-light.png">
-    <img src="./docs/assets/tinypaste-logo-light.png" width="240" alt="TinyPaste logo">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/tinypaste-logo-light.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/assets/tinypaste-logo-dark.png">
+    <img src="./docs/assets/tinypaste-logo-dark.png" width="240" alt="TinyPaste logo">
   </picture>
 </p>
 
