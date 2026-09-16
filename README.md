@@ -7,16 +7,11 @@ and who can read it, and share a short link. No account, no tracking, no feed.
 
 ---
 
-## Screenshots
+<img width="1920" height="951" alt="brave_suMtsXEXOd" src="https://github.com/user-attachments/assets/a03ad65a-019e-4c3b-8402-a00c5b9eeaab" />
+<img width="1920" height="951" alt="brave_08JQwt357a" src="https://github.com/user-attachments/assets/b8e41e0b-0395-4e5f-b603-c5dd14237686" />
+<img width="1920" height="951" alt="brave_olyb891XCc" src="https://github.com/user-attachments/assets/939f9c46-b9de-4eb1-937a-42bd10882e40" />
+<img width="1920" height="951" alt="brave_a5DKUUoVOl" src="https://github.com/user-attachments/assets/bcda61cb-0609-42ef-8fdc-db4adb7e3a77" />
 
-> _Screenshots are not committed to the repository. To capture your own, run the app locally and
-> photograph `/` (the editor) and `/p/<slug>` (a paste with syntax highlighting) in both themes._
-
-| Screen | Path |
-| --- | --- |
-| Editor | `/` |
-| Paste view | `/p/<slug>` |
-| Recent (local only) | `/recent` |
 
 ---
 
