@@ -16,19 +16,15 @@ unguessable link, lets the author choose how long it survives, and keeps ownersh
 browser through a one-time edit token. For material that should be hidden even from the server,
 TinyPaste can encrypt the payload in the browser before upload.
 
-## Why TinyPaste
+<img width="1920" height="951" alt="brave_suMtsXEXOd" src="https://github.com/user-attachments/assets/a03ad65a-019e-4c3b-8402-a00c5b9eeaab" />
+<img width="1920" height="951" alt="brave_08JQwt357a" src="https://github.com/user-attachments/assets/b8e41e0b-0395-4e5f-b603-c5dd14237686" />
+<img width="1920" height="951" alt="brave_olyb891XCc" src="https://github.com/user-attachments/assets/939f9c46-b9de-4eb1-937a-42bd10882e40" />
+<img width="1920" height="951" alt="brave_a5DKUUoVOl" src="https://github.com/user-attachments/assets/bcda61cb-0609-42ef-8fdc-db4adb7e3a77" />
 
-- **Three focused editors.** Monaco for code and plain text; Tiptap for formatted documents.
-- **Purpose-built sharing controls.** Expiration, passwords, and atomic burn-after-reading.
-- **Optional zero-knowledge storage.** AES-256-GCM encryption happens in the browser; the key stays
-  in the URL fragment and is never sent to the server.
-- **No account required.** A 256-bit edit token lets the creating browser edit or delete its paste.
-- **No discovery surface.** There is no global feed or listing API. Recent pastes live only in the
-  current browser.
-- **Safe rendering by construction.** Code is rendered from Shiki tokens and documents from a
-  closed, validated JSON schema—never from user-supplied HTML.
 
-## Authoring modes
+---
+
+## Features
 
 | Mode | Editor | Stored form | Reader experience |
 | --- | --- | --- | --- |
