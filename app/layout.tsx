@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { ThemeProvider, THEME_INIT_SCRIPT } from '@/components/theme-provider';
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <CommandPalette />
           </ToastProvider>
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
