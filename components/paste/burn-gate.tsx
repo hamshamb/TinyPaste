@@ -38,24 +38,27 @@ export function BurnGate({ slug, isCreator, onRevealed }: BurnGateProps) {
   };
 
   return (
-    <div className="mx-auto max-w-md rounded-lg border border-border-base bg-surface p-5 text-center tp-shadow">
-      <span className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-warning-soft text-warning">
-        <Flame aria-hidden className="h-5 w-5" />
+    <div className="mx-auto mt-8 w-full max-w-md rounded-xl border border-border-base bg-surface p-5 tp-shadow">
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-warning-line bg-warning-soft text-warning">
+        <Flame aria-hidden className="h-5 w-5" strokeWidth={1.9} />
       </span>
-      <h2 className="text-sm font-semibold">This paste burns after reading.</h2>
-      <p className="mx-auto mt-1.5 max-w-sm text-sm text-text-muted">
+      <h2 className="mt-3 text-sm font-semibold">This paste burns after reading.</h2>
+      <p className="mt-1 text-[13px] text-text-muted">
         Opening it destroys the stored copy permanently. Make sure you are ready to read it now.
       </p>
 
       {isCreator ? (
-        <p className="mt-4 rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-left text-xs text-warning">
+        <p className="mt-3 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">
           You just created this paste, and opening it here would consume it before you can share it. Copy the
           link first — the recipient reveals it themselves.
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-4 rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+        <p
+          role="alert"
+          className="mt-3 rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-[13px] text-danger"
+        >
           {error}
         </p>
       ) : null}

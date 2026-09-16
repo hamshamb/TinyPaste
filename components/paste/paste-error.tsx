@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { FileQuestion, Flame, TimerOff, TriangleAlert } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { OrphanDelete } from '@/components/paste/orphan-delete';
 import type { ErrorCode } from '@/lib/errors';
 
-const STATES: Partial<Record<ErrorCode, { icon: typeof FileQuestion; title: string; detail: string }>> = {
+const STATES: Partial<Record<ErrorCode, { icon: LucideIcon; title: string; detail: string }>> = {
   PASTE_NOT_FOUND: {
     icon: FileQuestion,
     title: 'Paste not found.',
@@ -51,15 +52,15 @@ export function PasteErrorState({ code, slug }: { code: ErrorCode; slug?: string
   const deletable = slug !== undefined && (code === 'PASTE_EXPIRED' || code === 'PASTE_BURNED');
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center px-4 py-20 text-center">
-      <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-border-base bg-surface text-text-muted">
-        <Icon aria-hidden className="h-5 w-5" />
+    <div className="mx-auto flex w-full max-w-md flex-col items-center px-4 py-24 text-center">
+      <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border-base bg-surface text-text-muted tp-shadow">
+        <Icon aria-hidden className="h-5 w-5" strokeWidth={1.8} />
       </span>
-      <h1 className="text-base font-semibold">{state.title}</h1>
-      <p className="mt-2 text-sm text-text-muted">{state.detail}</p>
+      <h1 className="text-[15px] font-semibold">{state.title}</h1>
+      <p className="mt-2 text-[13px] text-text-muted">{state.detail}</p>
       <Link
         href="/"
-        className="mt-6 inline-flex h-10 items-center rounded-md border border-border-base bg-surface px-4 text-sm font-medium transition-colors hover:bg-surface-muted"
+        className="mt-6 inline-flex h-9 items-center rounded-md border border-border-base bg-surface px-3.5 text-[13px] font-medium tp-transition hover:border-border-strong hover:bg-surface-muted"
       >
         Create a new paste
       </Link>

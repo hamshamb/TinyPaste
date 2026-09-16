@@ -1,6 +1,7 @@
 'use client';
 
 import { LOCAL_HISTORY_KEY, LOCAL_HISTORY_LIMIT } from '@/lib/config/constants';
+import type { ContentTypeId } from '@/lib/paste/content-type';
 
 /**
  * Per-browser paste history.
@@ -13,6 +14,11 @@ export type HistoryEntry = {
   slug: string;
   title: string | null;
   language: string;
+  /**
+   * Optional: entries written before content types existed have none. Absent
+   * is treated the same as 'code' by anything that reads this field.
+   */
+  contentType?: ContentTypeId;
   createdAt: string;
   expiresAt: string | null;
   isEncrypted: boolean;

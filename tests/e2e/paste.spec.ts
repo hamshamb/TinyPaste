@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createPaste, expectVisibleText, formError, recipientUrl } from './helpers';
+import { createPaste, expectCodeEditorValue, expectVisibleText, formError, recipientUrl } from './helpers';
 
 test.describe('plain pastes', () => {
   test('creates a paste, shares it, and survives a reload', async ({ page }) => {
@@ -56,8 +56,8 @@ test.describe('plain pastes', () => {
 
     await page.getByRole('button', { name: 'Fork' }).click();
     await page.waitForURL(/\/$/);
-    await expect(page.getByLabel('Paste content')).toHaveValue('forkable content');
-    await expect(page.getByPlaceholder('Optional title')).toHaveValue('Fork of Original');
+    await expectCodeEditorValue(page, 'forkable content');
+    await expect(page.getByLabel('Title')).toHaveValue('Fork of Original');
 
     await page.goto(recipientUrl(original));
     await expectVisibleText(page, 'forkable content');
@@ -76,7 +76,7 @@ test.describe('plain pastes', () => {
 test.describe('validation and limits', () => {
   test('refuses an empty paste', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Create Paste' }).click();
+    await page.getByRole('button', { name: 'Create paste' }).click();
 
     await expect(formError(page, 'Enter something to paste')).toBeVisible();
     await expect(page).toHaveURL(/\/$/);

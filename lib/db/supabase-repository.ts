@@ -2,10 +2,11 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { NewPasteRecord, PasteRecord, PasteUpdate } from '@/types/paste';
 import type { LanguageId } from '@/lib/paste/languages';
+import { inferLegacyContentType, isContentTypeId, type ContentTypeId } from '@/lib/paste/content-type';
 import { logError } from '@/lib/security/logger';
 import type { BurnedContent, PasteRepository } from './repository';
 
-/** Shape of the `pastes` table. Mirrors supabase/migrations/0001_init.sql. */
+/** Shape of the `pastes` table. Mirrors supabase/migrations/0001_init.sql and 0002_content_types.sql. */
 type PasteRow = {
   id: string;
   slug: string;
@@ -16,6 +17,7 @@ type PasteRow = {
   encryption_version: number | null;
   is_encrypted: boolean;
   language: string;
+  content_type: string | null;
   created_at: string;
   updated_at: string;
   expires_at: string | null;
@@ -28,10 +30,17 @@ type PasteRow = {
 };
 
 const SELECT_COLUMNS =
-  'id,slug,title,content,encrypted_content,encryption_iv,encryption_version,is_encrypted,language,created_at,updated_at,expires_at,password_hash,burn_after_read,burned_at,edit_token_hash,views,content_size';
+  'id,slug,title,content,encrypted_content,encryption_iv,encryption_version,is_encrypted,language,content_type,created_at,updated_at,expires_at,password_hash,burn_after_read,burned_at,edit_token_hash,views,content_size';
 
 /** Postgres unique-violation. Signals a slug collision so the caller can retry. */
 const UNIQUE_VIOLATION = '23505';
+
+function toContentType(value: string | null, language: string): ContentTypeId {
+  // The migration backfills every row and the column is NOT NULL, so this
+  // fallback only matters for a row this driver has not read since a fresh
+  // 0002 migration — cheap insurance, never the normal path.
+  return isContentTypeId(value) ? value : inferLegacyContentType(language);
+}
 
 function toRecord(row: PasteRow): PasteRecord {
   return {
@@ -44,6 +53,7 @@ function toRecord(row: PasteRow): PasteRecord {
     encryptionVersion: row.encryption_version,
     isEncrypted: row.is_encrypted,
     language: row.language as LanguageId,
+    contentType: toContentType(row.content_type, row.language),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     expiresAt: row.expires_at,
@@ -87,6 +97,7 @@ export class SupabasePasteRepository implements PasteRepository {
         encryption_version: record.encryptionVersion,
         is_encrypted: record.isEncrypted,
         language: record.language,
+        content_type: record.contentType,
         created_at: record.createdAt,
         expires_at: record.expiresAt,
         password_hash: record.passwordHash,

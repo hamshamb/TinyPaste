@@ -29,7 +29,7 @@ export function DeletePasteDialog({ open, deleting, onCancel, onConfirm }: Delet
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 tp-overlay tp-fade"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !deleting) onCancel();
       }}
@@ -39,25 +39,19 @@ export function DeletePasteDialog({ open, deleting, onCancel, onConfirm }: Delet
         aria-modal="true"
         aria-labelledby="delete-dialog-title"
         aria-describedby="delete-dialog-description"
-        className="w-full max-w-sm rounded-lg border border-border-base bg-surface p-5 tp-shadow"
+        className="w-full max-w-sm rounded-xl border border-border-base bg-surface p-5 tp-shadow-pop tp-pop"
       >
         <h2 id="delete-dialog-title" className="text-sm font-semibold">
           Delete this paste?
         </h2>
-        <p id="delete-dialog-description" className="mt-1.5 text-sm text-text-muted">
+        <p id="delete-dialog-description" className="mt-1.5 text-[13px] text-text-muted">
           This cannot be undone. The link stops working immediately for everyone.
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={onCancel} disabled={deleting}>
             Cancel
           </Button>
-          <Button
-            ref={confirmRef}
-            variant="danger"
-            onClick={onConfirm}
-            disabled={deleting}
-            className="border-danger text-danger"
-          >
+          <Button ref={confirmRef} variant="danger" onClick={onConfirm} disabled={deleting}>
             {deleting ? (
               <>
                 <Loader2 aria-hidden className="h-4 w-4 animate-spin" />

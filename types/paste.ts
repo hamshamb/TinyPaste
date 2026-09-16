@@ -1,11 +1,17 @@
 import type { LanguageId } from '@/lib/paste/languages';
+import type { ContentTypeId } from '@/lib/paste/content-type';
 
 /** Full database row. Never leaves the server unfiltered. */
 export type PasteRecord = {
   id: string;
   slug: string;
   title: string | null;
-  /** Plaintext body. Null for browser-encrypted pastes. */
+  /**
+   * Plaintext body. Null for browser-encrypted pastes.
+   *
+   * For a `document` paste this is JSON.stringify of a validated
+   * lib/document/schema.ts document, not free text — see contentType.
+   */
   content: string | null;
   /** Base64 AES-GCM ciphertext. Null for plaintext pastes. */
   encryptedContent: string | null;
@@ -14,6 +20,8 @@ export type PasteRecord = {
   encryptionVersion: number | null;
   isEncrypted: boolean;
   language: LanguageId;
+  /** How `content` (once decrypted, for an encrypted paste) is interpreted. */
+  contentType: ContentTypeId;
   createdAt: string;
   updatedAt: string;
   expiresAt: string | null;
@@ -30,6 +38,7 @@ export type PasteMetadata = {
   slug: string;
   title: string | null;
   language: LanguageId;
+  contentType: ContentTypeId;
   createdAt: string;
   updatedAt: string;
   expiresAt: string | null;

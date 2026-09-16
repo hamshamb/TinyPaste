@@ -19,9 +19,9 @@ type ToastContextValue = {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TONE_STYLES: Record<ToastTone, string> = {
-  success: 'border-l-[3px] border-l-success',
-  error: 'border-l-[3px] border-l-danger',
-  info: 'border-l-[3px] border-l-accent',
+  success: 'text-success',
+  error: 'text-danger',
+  info: 'text-accent',
 };
 
 const TONE_ICONS: Record<ToastTone, typeof Check> = {
@@ -67,7 +67,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         // Assertive would interrupt the user mid-action; these are confirmations.
         aria-live="polite"
         aria-atomic="false"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4 sm:items-end sm:p-6"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4 sm:items-end sm:p-5"
       >
         {toasts.map((item) => {
           const Icon = TONE_ICONS[item.tone];
@@ -75,18 +75,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={item.id}
               className={cn(
-                'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-md border border-border-base',
-                'bg-surface px-3 py-2.5 text-sm text-text-base tp-shadow',
-                TONE_STYLES[item.tone],
+                'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-lg border border-border-base',
+                'bg-surface px-3 py-2.5 text-[13px] text-text-base tp-shadow-pop tp-rise',
               )}
             >
-              <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+              <Icon
+                aria-hidden
+                className={cn('mt-0.5 h-4 w-4 shrink-0', TONE_STYLES[item.tone])}
+                strokeWidth={2}
+              />
               <span className="min-w-0 flex-1 break-words">{item.message}</span>
               <button
                 type="button"
                 onClick={() => dismiss(item.id)}
                 aria-label="Dismiss notification"
-                className="-mr-1 rounded p-1 text-text-subtle transition-colors hover:text-text-base"
+                className="-mr-1 rounded p-1 text-text-subtle tp-transition hover:text-text-base"
               >
                 <X aria-hidden className="h-3.5 w-3.5" />
               </button>

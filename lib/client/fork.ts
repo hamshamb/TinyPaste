@@ -1,8 +1,16 @@
 'use client';
 
+import type { ContentTypeId } from '@/lib/paste/content-type';
+
 export type ForkSeed = {
+  /**
+   * The Monaco source for code/plaintext, or JSON.stringify of the original
+   * validated document for a document paste — never flattened to plain text,
+   * so forking a document reopens Tiptap with the same structure.
+   */
   content: string;
   language: string;
+  contentType: ContentTypeId;
   title: string | null;
 };
 

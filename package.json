@@ -4,20 +4,36 @@
   "private": true,
   "description": "TinyPaste — share text without the noise. A privacy-focused pastebin.",
   "scripts": {
+    "predev": "node scripts/copy-monaco-assets.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-monaco-assets.mjs",
     "build": "next build",
+    "prestart": "node scripts/copy-monaco-assets.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "pretest:e2e": "node scripts/copy-monaco-assets.mjs",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.116.0",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-color": "^3.31.3",
+    "@tiptap/extension-highlight": "^3.31.3",
+    "@tiptap/extension-placeholder": "^3.31.3",
+    "@tiptap/extension-text-align": "^3.31.3",
+    "@tiptap/extension-text-style": "^3.31.3",
+    "@tiptap/html": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.46.0",
+    "monaco-editor": "^0.56.0",
     "next": "^16.3.5",
     "qrcode-generator": "^2.0.4",
     "react": "^19.3.0",
@@ -41,5 +57,10 @@
   },
   "allowScripts": {
     "unrs-resolver@1.12.2": true
+  },
+  "overrides": {
+    "monaco-editor": {
+      "dompurify": "^3.4.15"
+    }
   }
 }

@@ -18,6 +18,7 @@ import type {
 import { isExpired, resolveExpiresAt, type ExpirationId } from './expiration';
 import { generateSlug, isValidSlug } from './slug';
 import type { LanguageId } from './languages';
+import type { ContentTypeId } from './content-type';
 
 /** Public metadata projection. Password and edit-token hashes never appear here. */
 export function toMetadata(record: PasteRecord): PasteMetadata {
@@ -25,6 +26,7 @@ export function toMetadata(record: PasteRecord): PasteMetadata {
     slug: record.slug,
     title: record.title,
     language: record.language,
+    contentType: record.contentType,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     expiresAt: record.expiresAt,
@@ -150,6 +152,18 @@ export async function readPlaintextForExport(slug: string): Promise<{ meta: Past
       message: 'This paste is encrypted in the browser. The server holds no readable copy.',
     });
   }
+  /**
+   * A document paste's `content` column holds serialized document JSON, not
+   * the text a human would want from "Raw" or a download — and the raw route
+   * strips its own security headers on the way out, so this is not merely a
+   * cosmetic choice. Document export is a client-side feature instead, built
+   * from the same decrypted/loaded document the paste page already renders.
+   */
+  if (record.contentType === 'document') {
+    throw new AppError('EDIT_NOT_ALLOWED', {
+      message: 'Document pastes can only be exported from the paste page.',
+    });
+  }
   return { meta: toMetadata(record), text: record.content ?? '' };
 }
 
@@ -184,6 +198,7 @@ export async function createPaste(input: CreatePasteInput): Promise<CreatePasteR
     title: input.title,
     ...fields,
     language: input.language as LanguageId,
+    contentType: input.contentType as ContentTypeId,
     createdAt: createdAt.toISOString(),
     expiresAt: resolveExpiresAt(input.expiration as ExpirationId, createdAt)?.toISOString() ?? null,
     // Only the hash is persisted; the plaintext password is discarded here.
@@ -270,6 +285,11 @@ export async function updatePaste(
   if (record.isEncrypted !== input.isEncrypted) {
     throw new AppError('EDIT_NOT_ALLOWED', {
       message: 'The encryption mode of a paste cannot be changed after creation.',
+    });
+  }
+  if (record.contentType !== input.contentType) {
+    throw new AppError('EDIT_NOT_ALLOWED', {
+      message: 'The content type of a paste cannot be changed after creation.',
     });
   }
 

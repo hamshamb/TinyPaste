@@ -4,9 +4,9 @@ import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type Selec
 import { cn } from '@/lib/utils/cn';
 
 const CONTROL_CLASSES =
-  'h-10 w-full rounded-md border border-border-base bg-surface px-3 text-sm text-text-base ' +
-  'placeholder:text-text-subtle transition-colors hover:border-border-strong ' +
-  'disabled:cursor-not-allowed disabled:opacity-60';
+  'h-10 w-full rounded-md border border-border-base bg-bg px-3 text-sm text-text-base ' +
+  'placeholder:text-text-subtle tp-transition hover:border-border-strong ' +
+  'focus:border-accent-line disabled:cursor-not-allowed disabled:opacity-60';
 
 type FieldShellProps = {
   id: string;
@@ -25,7 +25,13 @@ type FieldShellProps = {
 export function FieldShell({ id, label, hint, error, labelHidden, children, className }: FieldShellProps) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className={cn('text-xs font-medium text-text-muted', labelHidden && 'sr-only')}>
+      <label
+        htmlFor={id}
+        className={cn(
+          'text-[11px] font-medium uppercase tracking-[0.06em] text-text-subtle',
+          labelHidden && 'sr-only',
+        )}
+      >
         {label}
       </label>
       {children}
@@ -105,7 +111,12 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-        className={cn(CONTROL_CLASSES, 'cursor-pointer pr-8', error && 'border-danger', className)}
+        className={cn(
+          CONTROL_CLASSES,
+          'cursor-pointer pr-8 [&>option]:bg-surface [&>option]:text-text-base',
+          error && 'border-danger',
+          className,
+        )}
         {...props}
       >
         {options.map((option) => (
@@ -117,37 +128,3 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
     </FieldShell>
   );
 });
-
-export type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'id' | 'type'> & {
-  label: string;
-  description?: ReactNode;
-};
-
-export function Checkbox({ label, description, className, ...props }: CheckboxProps) {
-  const id = useId();
-  return (
-    <div className="flex items-start gap-2.5">
-      <input
-        id={id}
-        type="checkbox"
-        aria-describedby={description ? `${id}-description` : undefined}
-        className={cn(
-          'mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border border-border-strong accent-[var(--tp-accent)]',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          className,
-        )}
-        {...props}
-      />
-      <div className="min-w-0">
-        <label htmlFor={id} className="cursor-pointer text-sm font-medium text-text-base">
-          {label}
-        </label>
-        {description ? (
-          <p id={`${id}-description`} className="text-xs text-text-subtle">
-            {description}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-}

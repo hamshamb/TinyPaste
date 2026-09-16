@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { createPaste, expectVisibleText, recipientUrl } from './helpers';
+import {
+  createPaste,
+  expectCodeEditorValue,
+  expectVisibleText,
+  fillCodeEditor,
+  recipientUrl,
+  securityToggle,
+} from './helpers';
 
 const SECRET = 'AWS_SECRET_ACCESS_KEY=never-send-me-to-a-server';
 
@@ -67,7 +74,7 @@ test.describe('browser-side encryption', () => {
 
     await page.goto(recipientUrl(url));
     await expectVisibleText(page, SECRET);
-    await expect(page.getByText(/Decrypted in your browser/)).toBeVisible();
+    await expect(page.getByText(/Decrypted locally in this browser/)).toBeVisible();
   });
 
   test('reports a missing key when the fragment is dropped', async ({ page }) => {
@@ -113,9 +120,9 @@ test.describe('browser-side encryption', () => {
     // The edit link must carry the fragment key, or the form cannot decrypt.
     await page.getByRole('link', { name: 'Edit' }).click();
     await page.waitForURL(/\/edit/);
-    await expect(page.getByLabel('Paste content')).toHaveValue(SECRET);
+    await expectCodeEditorValue(page, SECRET);
 
-    await page.getByLabel('Paste content').fill('ROTATED_SECRET=still-encrypted');
+    await fillCodeEditor(page, 'ROTATED_SECRET=still-encrypted');
     await page.getByRole('button', { name: 'Save changes' }).click();
     await page.waitForURL(/\/p\/[A-Za-z0-9]+/);
     await expectVisibleText(page, 'ROTATED_SECRET=still-encrypted');
@@ -129,14 +136,19 @@ test.describe('browser-side encryption', () => {
 
   test('cannot be combined with a password', async ({ page }) => {
     await page.goto('/');
-    await page.getByLabel('Paste content').fill('x');
-    await page.getByRole('button', { name: /Security options/ }).click();
+    await fillCodeEditor(page, 'x');
 
-    await page.getByLabel('Encrypt in browser').check();
-    await expect(page.getByLabel('Password protect')).toBeDisabled();
+    const encrypt = securityToggle(page, 'Encrypt');
+    const password = securityToggle(page, 'Password');
 
-    await page.getByLabel('Encrypt in browser').uncheck();
-    await page.getByLabel('Password protect').check();
-    await expect(page.getByLabel('Encrypt in browser')).toBeDisabled();
+    await encrypt.click();
+    await expect(encrypt).toHaveAttribute('aria-pressed', 'true');
+    await expect(password).toBeDisabled();
+
+    await encrypt.click();
+    await expect(encrypt).toHaveAttribute('aria-pressed', 'false');
+    await password.click();
+    await expect(password).toHaveAttribute('aria-pressed', 'true');
+    await expect(encrypt).toBeDisabled();
   });
 });

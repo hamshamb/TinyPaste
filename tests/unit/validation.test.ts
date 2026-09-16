@@ -137,6 +137,66 @@ describe('createPasteSchema — encrypted', () => {
   });
 });
 
+describe('createPasteSchema — content type', () => {
+  it('defaults to "code" when omitted, so an old client keeps working', () => {
+    const result = createPasteSchema.safeParse(validPlain);
+    expect(result.success && result.data.contentType).toBe('code');
+  });
+
+  it('accepts an explicit contentType of plaintext or document', () => {
+    expect(createPasteSchema.safeParse({ ...validPlain, contentType: 'plaintext' }).success).toBe(true);
+    const doc = createPasteSchema.safeParse({
+      ...validPlain,
+      contentType: 'document',
+      content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hi' }] }] }),
+    });
+    expect(doc.success).toBe(true);
+  });
+
+  it('rejects an unknown content type', () => {
+    expect(createPasteSchema.safeParse({ ...validPlain, contentType: 'spreadsheet' }).success).toBe(false);
+  });
+
+  it('validates a document paste\'s content against the document schema', () => {
+    const result = createPasteSchema.safeParse({ ...validPlain, contentType: 'document', content: 'not json' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(formatIssues(result.error).join(' ')).toMatch(/document/i);
+    }
+  });
+
+  it('rejects a document paste whose JSON contains an unsupported node', () => {
+    const result = createPasteSchema.safeParse({
+      ...validPlain,
+      contentType: 'document',
+      content: JSON.stringify({ type: 'doc', content: [{ type: 'video', attrs: { src: 'x' } }] }),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a document paste with a dangerous link scheme', () => {
+    const result = createPasteSchema.safeParse({
+      ...validPlain,
+      contentType: 'document',
+      content: JSON.stringify({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'click', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }],
+          },
+        ],
+      }),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('never validates an encrypted document\'s content as JSON — it is ciphertext the server cannot read', () => {
+    const result = createPasteSchema.safeParse({ ...validEncrypted, contentType: 'document' });
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('updatePasteSchema', () => {
   it('accepts a plaintext edit', () => {
     const result = updatePasteSchema.safeParse({
@@ -177,6 +237,27 @@ describe('updatePasteSchema', () => {
     expect(result.success).toBe(true);
     expect(result.success && 'password' in result.data).toBe(false);
     expect(result.success && 'burnAfterRead' in result.data).toBe(false);
+  });
+
+  it('defaults contentType to "code" when omitted, and validates document content when set', () => {
+    const withoutType = updatePasteSchema.safeParse({
+      isEncrypted: false,
+      content: 'updated',
+      title: null,
+      language: 'plaintext',
+      expiration: '1d',
+    });
+    expect(withoutType.success && withoutType.data.contentType).toBe('code');
+
+    const invalidDoc = updatePasteSchema.safeParse({
+      isEncrypted: false,
+      content: 'not json',
+      title: null,
+      language: 'plaintext',
+      contentType: 'document',
+      expiration: '1d',
+    });
+    expect(invalidDoc.success).toBe(false);
   });
 });
 
