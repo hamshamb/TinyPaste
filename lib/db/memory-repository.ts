@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { NewPasteRecord, PasteRecord, PasteUpdate } from '@/types/paste';
 import { isExpired } from '@/lib/paste/expiration';
+import { inferLegacyContentType, isContentTypeId } from '@/lib/paste/content-type';
 import type { BurnedContent, PasteRepository } from './repository';
 
 /**
@@ -29,7 +30,12 @@ export class MemoryPasteRepository implements PasteRepository {
       const parsed: unknown = JSON.parse(readFileSync(this.snapshotPath, 'utf8'));
       if (!Array.isArray(parsed)) return;
       for (const row of parsed as PasteRecord[]) {
-        if (row && typeof row.slug === 'string') this.rows.set(row.slug, row);
+        if (!row || typeof row.slug !== 'string') continue;
+        // A snapshot written before content types existed has no contentType
+        // field at all — infer it from language, exactly as the SQL migration
+        // backfills the same column for a production database.
+        if (!isContentTypeId(row.contentType)) row.contentType = inferLegacyContentType(row.language);
+        this.rows.set(row.slug, row);
       }
     } catch {
       // A corrupt dev snapshot is never fatal — start from an empty store.

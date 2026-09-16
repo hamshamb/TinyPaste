@@ -31,6 +31,7 @@ function plainInput(overrides: Partial<CreatePasteInput> = {}): CreatePasteInput
     content: 'hello world',
     title: 'Notes',
     language: 'plaintext',
+    contentType: 'code',
     expiration: '1d',
     burnAfterRead: false,
     password: null,
@@ -76,6 +77,7 @@ describe('createPaste', () => {
       encryptionVersion: 1,
       title: 'Secret',
       language: 'json',
+      contentType: 'code',
       expiration: '1h',
       burnAfterRead: false,
       password: null,
@@ -260,10 +262,22 @@ describe('export routes', () => {
       encryptionVersion: 1,
       title: null,
       language: 'plaintext',
+      contentType: 'code',
       expiration: '1d',
       burnAfterRead: false,
       password: null,
     } as CreatePasteInput);
+
+    await expectAppError(readPlaintextForExport(created.slug), 'EDIT_NOT_ALLOWED');
+  });
+
+  it('refuses a document paste, which can only be exported from the paste page', async () => {
+    const created = await createPaste(
+      plainInput({
+        contentType: 'document',
+        content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] }),
+      } as Partial<CreatePasteInput>),
+    );
 
     await expectAppError(readPlaintextForExport(created.slug), 'EDIT_NOT_ALLOWED');
   });
@@ -275,6 +289,7 @@ describe('edit token authorisation', () => {
     content: 'edited body',
     title: 'Edited',
     language: 'markdown',
+    contentType: 'code' as const,
     expiration: '7d',
   };
 
@@ -371,6 +386,7 @@ describe('deleting a paste that can no longer be read', () => {
         content: 'revived',
         title: null,
         language: 'plaintext',
+        contentType: 'code',
         expiration: '1d',
       }),
       'PASTE_BURNED',
@@ -387,6 +403,7 @@ describe('edit restrictions', () => {
         content: 'x',
         title: null,
         language: 'plaintext',
+        contentType: 'code',
         expiration: '1d',
       }),
       'EDIT_NOT_ALLOWED',
@@ -402,6 +419,7 @@ describe('edit restrictions', () => {
       encryptionVersion: 1,
       title: null,
       language: 'plaintext',
+      contentType: 'code',
       expiration: '1d',
       burnAfterRead: false,
       password: null,
@@ -413,6 +431,7 @@ describe('edit restrictions', () => {
         content: 'downgraded to plaintext',
         title: null,
         language: 'plaintext',
+        contentType: 'code',
         expiration: '1d',
       }),
       'EDIT_NOT_ALLOWED',
@@ -430,6 +449,22 @@ describe('edit restrictions', () => {
         encryptionVersion: 1,
         title: null,
         language: 'plaintext',
+        contentType: 'code',
+        expiration: '1d',
+      }),
+      'EDIT_NOT_ALLOWED',
+    );
+  });
+
+  it('refuses to reinterpret a code paste as a document', async () => {
+    const created = await createPaste(plainInput());
+    await expectAppError(
+      updatePaste(created.slug, created.editToken, {
+        isEncrypted: false,
+        content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] }),
+        title: null,
+        language: 'plaintext',
+        contentType: 'document',
         expiration: '1d',
       }),
       'EDIT_NOT_ALLOWED',
@@ -445,6 +480,7 @@ describe('edit restrictions', () => {
       content: 'edited',
       title: null,
       language: 'plaintext',
+      contentType: 'code',
       expiration: '1d',
     });
 

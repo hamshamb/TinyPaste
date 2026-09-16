@@ -2,9 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, Eraser, FilePlus2, Search, SunMoon, TextCursorInput, Zap } from 'lucide-react';
+import {
+  BookText,
+  Clock,
+  CornerDownLeft,
+  Eraser,
+  FilePlus2,
+  Search,
+  ShieldQuestion,
+  SunMoon,
+  TextCursorInput,
+  Zap,
+} from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
+import { Kbd } from '@/components/ui/kbd';
 import { cn } from '@/lib/utils/cn';
+
+/** Lets any chrome (the header button, for one) summon the palette. */
+export const OPEN_COMMAND_PALETTE_EVENT = 'tinypaste:open-palette';
 
 type Command = {
   id: string;
@@ -71,6 +86,8 @@ export function CommandPalette() {
         run: () => router.push('/recent'),
       },
       { id: 'theme', label: 'Toggle theme', icon: SunMoon, run: cycle },
+      { id: 'about', label: 'About TinyPaste', icon: BookText, run: () => router.push('/about') },
+      { id: 'privacy', label: 'Privacy', icon: ShieldQuestion, run: () => router.push('/privacy') },
     ],
     [cycle, router],
   );
@@ -82,15 +99,22 @@ export function CommandPalette() {
   }, [commands, query]);
 
   useEffect(() => {
+    const toggle = () => {
+      previouslyFocused.current = document.activeElement as HTMLElement | null;
+      setOpen((current) => !current);
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        previouslyFocused.current = document.activeElement as HTMLElement | null;
-        setOpen((current) => !current);
+        toggle();
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, toggle);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, toggle);
+    };
   }, []);
 
   useEffect(() => {
@@ -108,7 +132,7 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[12vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[14vh] tp-overlay tp-fade"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) close();
       }}
@@ -117,10 +141,10 @@ export function CommandPalette() {
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="w-full max-w-md overflow-hidden rounded-lg border border-border-base bg-surface tp-shadow"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-border-base bg-surface tp-shadow-pop tp-pop"
       >
-        <div className="flex items-center gap-2 border-b border-border-base px-3">
-          <Search aria-hidden className="h-4 w-4 shrink-0 text-text-subtle" />
+        <div className="flex items-center gap-2.5 border-b border-border-base px-3.5">
+          <Search aria-hidden className="h-4 w-4 shrink-0 text-text-subtle" strokeWidth={1.9} />
           <input
             ref={inputRef}
             value={query}
@@ -147,12 +171,14 @@ export function CommandPalette() {
             aria-label="Search commands"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-text-subtle"
           />
+          <Kbd className="hidden shrink-0 sm:inline-flex">Esc</Kbd>
         </div>
-        <ul className="max-h-72 overflow-y-auto p-1.5">
+        <ul className="max-h-[19rem] overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
             <li className="px-3 py-6 text-center text-sm text-text-subtle">No matching command.</li>
           ) : (
             filtered.map((command, index) => {
+              const active = index === activeIndex;
               const Icon = command.icon;
               return (
                 <li key={command.id}>
@@ -161,14 +187,21 @@ export function CommandPalette() {
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => runAt(index)}
                     className={cn(
-                      'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors',
-                      index === activeIndex ? 'bg-surface-muted text-text-base' : 'text-text-muted',
+                      'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] tp-transition',
+                      active ? 'bg-surface-muted text-text-base' : 'text-text-muted',
                     )}
                   >
-                    <Icon aria-hidden className="h-4 w-4 shrink-0" />
-                    <span className="flex-1">{command.label}</span>
+                    <Icon
+                      aria-hidden
+                      className={cn('h-4 w-4 shrink-0', active && 'text-accent')}
+                      strokeWidth={1.9}
+                    />
+                    <span className="flex-1 truncate font-medium">{command.label}</span>
                     {command.hint ? (
-                      <span className="font-mono text-[11px] text-text-subtle">{command.hint}</span>
+                      <span className="hidden text-[11px] text-text-subtle sm:inline">{command.hint}</span>
+                    ) : null}
+                    {active ? (
+                      <CornerDownLeft aria-hidden className="h-3.5 w-3.5 shrink-0 text-text-subtle" />
                     ) : null}
                   </button>
                 </li>

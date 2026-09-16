@@ -35,7 +35,9 @@ export function QrCode({ value, size = 168 }: { value: string; size?: number }) 
       height={size}
       viewBox={`0 0 ${path.count} ${path.count}`}
       shapeRendering="crispEdges"
-      className="rounded-md bg-white p-1"
+      // The quiet zone stays white whatever the theme: a dark QR on a dark page
+      // is not reliably scannable.
+      className="rounded-lg border border-border-base bg-white p-2"
     >
       <path d={path.d} fill="#000" />
     </svg>

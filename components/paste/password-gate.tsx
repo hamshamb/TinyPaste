@@ -41,24 +41,20 @@ export function PasswordGate({ slug, burnAfterRead, onUnlocked }: PasswordGatePr
   };
 
   return (
-    <div className="mx-auto max-w-sm rounded-lg border border-border-base bg-surface p-5 tp-shadow">
-      <div className="mb-4 flex items-center gap-2.5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-soft text-accent">
-          <KeyRound aria-hidden className="h-4 w-4" />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold">This paste is password protected.</h2>
-          <p className="text-xs text-text-muted">Enter the password to view its contents.</p>
-        </div>
-      </div>
+    <div className="mx-auto mt-8 w-full max-w-sm rounded-xl border border-border-base bg-surface p-5 tp-shadow">
+      <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent-line bg-accent-soft text-accent">
+        <KeyRound aria-hidden className="h-4 w-4" strokeWidth={1.9} />
+      </span>
+      <h2 className="mt-3 text-sm font-semibold">This paste is password protected.</h2>
+      <p className="mt-1 text-[13px] text-text-muted">Enter the password to view its contents.</p>
 
       {burnAfterRead ? (
-        <p className="mb-4 rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-xs text-warning">
+        <p className="mt-3 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">
           This paste also burns after reading. Unlocking it will consume it permanently.
         </p>
       ) : null}
 
-      <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
+      <form onSubmit={submit} className="mt-4 flex flex-col gap-3" noValidate>
         <TextField
           label="Password"
           type="password"
@@ -69,7 +65,7 @@ export function PasswordGate({ slug, burnAfterRead, onUnlocked }: PasswordGatePr
           autoFocus
           disabled={submitting}
         />
-        <Button type="submit" variant="primary" disabled={submitting || password.length === 0}>
+        <Button type="submit" variant="primary" size="lg" disabled={submitting || password.length === 0}>
           {submitting ? (
             <>
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />

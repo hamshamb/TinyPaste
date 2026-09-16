@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { createPaste, expectVisibleText, recipientUrl, waitForHydration } from './helpers';
+import {
+  createPaste,
+  expectCodeEditorValue,
+  expectVisibleText,
+  fillCodeEditor,
+  recipientUrl,
+  waitForHydration,
+} from './helpers';
 
 test.describe('edit tokens', () => {
   test('lets the creating browser edit a paste', async ({ page }) => {
@@ -8,8 +15,8 @@ test.describe('edit tokens', () => {
     await page.getByRole('link', { name: 'Edit' }).click();
     await page.waitForURL(/\/edit$/);
 
-    await page.getByLabel('Paste content').fill('second draft');
-    await page.getByPlaceholder('Optional title').fill('Final');
+    await fillCodeEditor(page, 'second draft');
+    await page.getByLabel('Title').fill('Final');
     await page.getByRole('button', { name: 'Save changes' }).click();
 
     await page.waitForURL(/\/p\/[A-Za-z0-9]+$/);
@@ -200,7 +207,7 @@ test.describe('keyboard and palette', () => {
   test('creates a paste with Ctrl+Enter', async ({ page }) => {
     await page.goto('/');
     await waitForHydration(page);
-    await page.getByLabel('Paste content').fill('created with the keyboard');
+    await fillCodeEditor(page, 'created with the keyboard');
     await page.keyboard.press('Control+Enter');
 
     await page.waitForURL(/\/p\/[A-Za-z0-9]+/);
@@ -223,12 +230,12 @@ test.describe('keyboard and palette', () => {
   test('clears the editor from the palette', async ({ page }) => {
     await page.goto('/');
     await waitForHydration(page);
-    await page.getByLabel('Paste content').fill('to be cleared');
+    await fillCodeEditor(page, 'to be cleared');
 
     await page.keyboard.press('Control+k');
     await page.getByPlaceholder('Type a command…').fill('clear');
     await page.keyboard.press('Enter');
 
-    await expect(page.getByLabel('Paste content')).toHaveValue('');
+    await expectCodeEditorValue(page, '');
   });
 });

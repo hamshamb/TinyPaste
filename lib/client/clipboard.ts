@@ -32,6 +32,31 @@ export async function copyText(value: string): Promise<boolean> {
   }
 }
 
+/**
+ * Copy rich text with a plain-text fallback in the same clipboard write.
+ *
+ * Used for document pastes: pasting into a rich editor (an email, a Google
+ * Doc) keeps formatting, while pasting into a plain-text field — or a browser
+ * that only supports writeText — gets the plain-text flattening instead. Both
+ * payloads are generated locally; nothing here ever leaves the browser.
+ */
+export async function copyRichText(html: string, plainText: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.write && window.isSecureContext && typeof ClipboardItem !== 'undefined') {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        }),
+      ]);
+      return true;
+    }
+  } catch {
+    // Fall through to the plain-text path.
+  }
+  return copyText(plainText);
+}
+
 /** Trigger a client-side download without ever sending the content anywhere. */
 export function downloadText(filename: string, text: string, mime = 'text/plain;charset=utf-8'): void {
   const blob = new Blob([text], { type: mime });

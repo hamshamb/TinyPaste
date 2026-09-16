@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { MemoryPasteRepository } from '@/lib/db/memory-repository';
 import { generateSlug } from '@/lib/paste/slug';
 import { hashEditToken, generateEditToken } from '@/lib/security/tokens';
@@ -15,6 +18,7 @@ function newRecord(overrides: Partial<NewPasteRecord> = {}): NewPasteRecord {
     encryptionVersion: null,
     isEncrypted: false,
     language: 'plaintext',
+    contentType: 'code',
     createdAt: new Date().toISOString(),
     expiresAt: null,
     passwordHash: null,
@@ -118,6 +122,114 @@ describe('MemoryPasteRepository', () => {
     expect(await repo.findBySlug(expired.slug)).toBeNull();
     expect(await repo.findBySlug(alive.slug)).not.toBeNull();
     expect(await repo.findBySlug(never.slug)).not.toBeNull();
+  });
+});
+
+/**
+ * A dev-store snapshot written before content types existed has no
+ * `contentType` field at all — this pins down that restoring one still
+ * produces a fully-typed, usable record, the same guarantee
+ * supabase/migrations/0002_content_types.sql gives a real database via its
+ * backfill.
+ */
+describe('legacy snapshot compatibility', () => {
+  function writeLegacySnapshot(rows: Array<Record<string, unknown>>): string {
+    const dir = mkdtempSync(join(tmpdir(), 'tinypaste-legacy-'));
+    const path = join(dir, 'pastes.json');
+    writeFileSync(path, JSON.stringify(rows), 'utf8');
+    return path;
+  }
+
+  it('infers "code" for a pre-existing row with a real language and no contentType field', async () => {
+    const path = writeLegacySnapshot([
+      {
+        id: 'legacy-1',
+        slug: 'Legacy001',
+        title: 'Old code paste',
+        content: 'console.log(1)',
+        encryptedContent: null,
+        encryptionIv: null,
+        encryptionVersion: null,
+        isEncrypted: false,
+        language: 'javascript',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        expiresAt: null,
+        passwordHash: null,
+        burnAfterRead: false,
+        burnedAt: null,
+        editTokenHash: 'x',
+        views: 0,
+        contentSize: 14,
+        // contentType intentionally absent.
+      },
+    ]);
+
+    const repo = new MemoryPasteRepository(path);
+    const row = await repo.findBySlug('Legacy001');
+    expect(row).not.toBeNull();
+    expect(row!.contentType).toBe('code');
+    // Nothing else about the pre-existing row is disturbed.
+    expect(row!.content).toBe('console.log(1)');
+  });
+
+  it('infers "plaintext" for a pre-existing row whose language was literally plaintext', async () => {
+    const path = writeLegacySnapshot([
+      {
+        id: 'legacy-2',
+        slug: 'Legacy002',
+        title: null,
+        content: 'just some notes',
+        encryptedContent: null,
+        encryptionIv: null,
+        encryptionVersion: null,
+        isEncrypted: false,
+        language: 'plaintext',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        expiresAt: null,
+        passwordHash: null,
+        burnAfterRead: false,
+        burnedAt: null,
+        editTokenHash: 'x',
+        views: 0,
+        contentSize: 16,
+      },
+    ]);
+
+    const repo = new MemoryPasteRepository(path);
+    const row = await repo.findBySlug('Legacy002');
+    expect(row!.contentType).toBe('plaintext');
+  });
+
+  it('leaves an already-typed row untouched', async () => {
+    const path = writeLegacySnapshot([
+      {
+        id: 'modern-1',
+        slug: 'Modern01',
+        title: null,
+        content: '{"type":"doc","content":[]}',
+        encryptedContent: null,
+        encryptionIv: null,
+        encryptionVersion: null,
+        isEncrypted: false,
+        language: 'plaintext',
+        contentType: 'document',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        expiresAt: null,
+        passwordHash: null,
+        burnAfterRead: false,
+        burnedAt: null,
+        editTokenHash: 'x',
+        views: 0,
+        contentSize: 28,
+      },
+    ]);
+
+    const repo = new MemoryPasteRepository(path);
+    const row = await repo.findBySlug('Modern01');
+    expect(row!.contentType).toBe('document');
   });
 });
 

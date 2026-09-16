@@ -8,6 +8,8 @@ import {
 import { base64ToBytes, base64UrlToBytes, bytesToBase64 } from '@/lib/crypto/base64';
 import { buildFragment, buildShareUrl, readKeyFromHash } from '@/lib/crypto/fragment';
 import { AES_IV_BYTES, CURRENT_ENCRYPTION_VERSION } from '@/lib/crypto/constants';
+import { parseDocumentJson } from '@/lib/document/schema';
+import { docToPlainText } from '@/lib/document/plain-text';
 
 const PLAINTEXT = 'const secret = "hunter2";\nconsole.log(secret); // 🔐 ünïcode';
 
@@ -192,5 +194,51 @@ describe('fragment handling', () => {
 
   it('omits the fragment for pastes without a key', () => {
     expect(buildShareUrl('https://example.com', 'K8x2FmQp', null)).toBe('https://example.com/p/K8x2FmQp');
+  });
+});
+
+/**
+ * DOCUMENT mode reuses the same generic string-encryption primitives as CODE
+ * and PLAIN TEXT — the only difference is that the string being encrypted is
+ * JSON.stringify of a validated document rather than free text. These tests
+ * exist to pin that contract down explicitly, since it's what lets
+ * "encrypt the serialized document JSON client-side" be true without any
+ * document-specific code in lib/crypto at all.
+ */
+describe('encrypting a document paste', () => {
+  const DOCUMENT = {
+    type: 'doc',
+    content: [
+      { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Confidential' }] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'Secret plan details.' }] },
+    ],
+  };
+
+  it('round-trips the serialized document through encrypt/decrypt', async () => {
+    const serialized = JSON.stringify(DOCUMENT);
+    const encrypted = await encryptText(serialized);
+    const decrypted = await decryptPayload(encrypted, encrypted.key);
+
+    expect(decrypted).toBe(serialized);
+    const parsed = parseDocumentJson(decrypted);
+    expect(docToPlainText(parsed)).toContain('Secret plan details.');
+  });
+
+  it('never leaves the document text readable in the ciphertext', async () => {
+    const serialized = JSON.stringify(DOCUMENT);
+    const encrypted = await encryptText(serialized);
+
+    expect(encrypted.ciphertext).not.toContain('Confidential');
+    expect(encrypted.ciphertext).not.toContain('Secret plan details');
+  });
+
+  it('re-encrypts with a fresh IV on edit, matching the edit-save flow', async () => {
+    const original = await encryptText(JSON.stringify(DOCUMENT));
+    const edited = { ...DOCUMENT, content: [...DOCUMENT.content, { type: 'paragraph', content: [{ type: 'text', text: 'Added later.' }] }] };
+    const reEncrypted = await encryptTextWithKey(JSON.stringify(edited), original.key);
+
+    expect(reEncrypted.iv).not.toBe(original.iv);
+    const decrypted = await decryptPayload(reEncrypted, original.key);
+    expect(docToPlainText(parseDocumentJson(decrypted))).toContain('Added later.');
   });
 });

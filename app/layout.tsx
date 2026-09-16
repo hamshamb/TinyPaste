@@ -37,13 +37,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             <a
               href="#main"
-              className="sr-only-focusable absolute left-4 top-3 z-50 rounded-md border border-border-base bg-surface px-3 py-2 text-sm font-medium"
+              className="sr-only-focusable absolute left-4 top-3 z-50 rounded-md border border-border-base bg-surface px-3 py-2 text-sm font-medium tp-shadow"
             >
               Skip to content
             </a>
             {volatileStorage ? <StorageNotice /> : null}
             <Header />
-            <main id="main" className="flex-1">
+            {/* A flex column so the editor can claim the whole viewport below
+                the header without hard-coding any chrome heights. */}
+            <main id="main" className="flex flex-1 flex-col">
               {children}
             </main>
             <Footer />

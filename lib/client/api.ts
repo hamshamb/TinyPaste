@@ -2,6 +2,7 @@
 
 import { EDIT_TOKEN_HEADER } from '@/lib/api/edit-token';
 import { ERROR_MESSAGES, isErrorCode, type ErrorCode } from '@/lib/errors';
+import type { ContentTypeId } from '@/lib/paste/content-type';
 import type { CreatePasteResult, PastePayload, PasteMetadata, PasteContent } from '@/types/paste';
 
 /** Error carrying the server's stable code, so the UI can branch on it. */
@@ -48,6 +49,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export type CreatePasteBody = {
   title: string | null;
   language: string;
+  contentType: ContentTypeId;
   expiration: string;
   burnAfterRead: boolean;
 } & (
@@ -86,6 +88,7 @@ export function loadPasteForEdit(
 export type UpdatePasteBody = {
   title: string | null;
   language: string;
+  contentType: ContentTypeId;
   expiration: string;
 } & (
   | { isEncrypted: false; content: string }

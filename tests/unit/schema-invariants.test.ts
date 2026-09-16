@@ -7,10 +7,11 @@ import type { PasteRecord } from '@/types/paste';
 /**
  * Guards the seam between application code and the database schema.
  *
- * The CHECK constraints in supabase/migrations/0001_init.sql are enforced by
- * Postgres, which the in-memory repository used in development and E2E does not
- * emulate. Without this file, a change to the service layer could produce rows
- * that pass every other test and then fail at runtime against a real database.
+ * The CHECK constraints in supabase/migrations/0001_init.sql and
+ * 0002_content_types.sql are enforced by Postgres, which the in-memory
+ * repository used in development and E2E does not emulate. Without this file,
+ * a change to the service layer could produce rows that pass every other test
+ * and then fail at runtime against a real database.
  *
  * The predicates below mirror the SQL exactly. If a constraint changes in the
  * migration, change it here too — a failure in this file means the application
@@ -29,6 +30,7 @@ type Row = {
   content_size: number;
   title: string | null;
   slug: string;
+  content_type: string;
 };
 
 /** camelCase record -> the snake_case column shape the constraints are written against. */
@@ -45,6 +47,7 @@ function toRow(record: PasteRecord): Row {
     content_size: record.contentSize,
     title: record.title,
     slug: record.slug,
+    content_type: record.contentType,
   };
 }
 
@@ -73,6 +76,23 @@ const encryptionExcludesPassword = (r: Row) => r.is_encrypted === false || r.pas
 const titleLength = (r: Row) => r.title === null || r.title.length <= 120;
 /** constraint pastes_slug_shape */
 const slugShape = (r: Row) => /^[A-Za-z0-9]{4,16}$/.test(r.slug);
+/** constraint pastes_content_type_shape (0002) */
+const contentTypeShape = (r: Row) => ['code', 'plaintext', 'document'].includes(r.content_type);
+/**
+ * constraint pastes_document_content_is_json (0002)
+ *
+ * Mirrors Postgres's `content::json` cast: syntactic validity only, not the
+ * application's node/mark schema — see lib/document/schema.ts for that layer.
+ */
+function documentContentIsJson(r: Row): boolean {
+  if (r.content_type !== 'document' || r.is_encrypted || r.content === null) return true;
+  try {
+    JSON.parse(r.content);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function expectSatisfiesSchema(record: PasteRecord, label: string): void {
   const row = toRow(record);
@@ -82,6 +102,8 @@ function expectSatisfiesSchema(record: PasteRecord, label: string): void {
   expect(encryptionExcludesPassword(row), `${label}: pastes_encryption_excludes_password`).toBe(true);
   expect(titleLength(row), `${label}: pastes_title_length`).toBe(true);
   expect(slugShape(row), `${label}: pastes_slug_shape`).toBe(true);
+  expect(contentTypeShape(row), `${label}: pastes_content_type_shape`).toBe(true);
+  expect(documentContentIsJson(row), `${label}: pastes_document_content_is_json`).toBe(true);
 }
 
 const store = globalThis as typeof globalThis & { __tinypasteRepository?: MemoryPasteRepository };
@@ -98,6 +120,7 @@ function plainInput(overrides: Partial<CreatePasteInput> = {}): CreatePasteInput
     content: 'hello world',
     title: 'Notes',
     language: 'plaintext',
+    contentType: 'code',
     expiration: '1d',
     burnAfterRead: false,
     password: null,
@@ -113,11 +136,26 @@ function encryptedInput(overrides: Partial<CreatePasteInput> = {}): CreatePasteI
     encryptionVersion: 1,
     title: 'Secret',
     language: 'json',
+    contentType: 'code',
     expiration: '1h',
     burnAfterRead: false,
     password: null,
     ...overrides,
   } as CreatePasteInput;
+}
+
+const VALID_DOCUMENT_JSON = JSON.stringify({
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hello document' }] }],
+});
+
+function documentInput(overrides: Partial<CreatePasteInput> = {}): CreatePasteInput {
+  return plainInput({
+    content: VALID_DOCUMENT_JSON,
+    contentType: 'document',
+    language: 'plaintext',
+    ...overrides,
+  } as Partial<CreatePasteInput>);
 }
 
 describe('rows written by createPaste satisfy the database constraints', () => {
@@ -130,6 +168,12 @@ describe('rows written by createPaste satisfy the database constraints', () => {
     ['encrypted', encryptedInput()],
     ['encrypted, burn after reading', encryptedInput({ burnAfterRead: true })],
     ['encrypted, never expires', encryptedInput({ expiration: 'never' })],
+    ['document', documentInput()],
+    ['document, burn after reading', documentInput({ burnAfterRead: true })],
+    [
+      'document, encrypted (content is ciphertext, never validated as JSON)',
+      encryptedInput({ contentType: 'document' } as Partial<CreatePasteInput>),
+    ],
   ])('%s', async (label, input) => {
     const created = await createPaste(input);
     const row = await repo.findBySlug(created.slug);
@@ -146,6 +190,7 @@ describe('rows written by updatePaste satisfy the database constraints', () => {
       content: 'edited body',
       title: 'Edited',
       language: 'markdown',
+      contentType: 'code',
       expiration: '30d',
     });
     expectSatisfiesSchema((await repo.findBySlug(created.slug))!, 'plaintext edit');
@@ -160,6 +205,7 @@ describe('rows written by updatePaste satisfy the database constraints', () => {
       encryptionVersion: 1,
       title: null,
       language: 'json',
+      contentType: 'code',
       expiration: 'never',
     });
     expectSatisfiesSchema((await repo.findBySlug(created.slug))!, 'encrypted edit');
@@ -172,6 +218,7 @@ describe('rows written by updatePaste satisfy the database constraints', () => {
       content: 'edited',
       title: null,
       language: 'plaintext',
+      contentType: 'code',
       expiration: '1d',
     });
     const row = await repo.findBySlug(created.slug);
@@ -230,6 +277,7 @@ describe('the constraint predicates reject the states they are meant to', () => 
     content_size: 2,
     title: null,
     slug: 'K8x2FmQp',
+    content_type: 'code',
   };
 
   it('rejects an unburned encrypted row with no ciphertext', () => {
@@ -271,5 +319,28 @@ describe('the constraint predicates reject the states they are meant to', () => 
     expect(
       encryptionExcludesPassword({ ...base, is_encrypted: true, password_hash: '$2b$12$x' }),
     ).toBe(false);
+  });
+
+  it('rejects a content_type outside code/plaintext/document', () => {
+    expect(contentTypeShape({ ...base, content_type: 'wordprocessor' })).toBe(false);
+  });
+
+  it('rejects a document row whose content is not valid JSON', () => {
+    expect(documentContentIsJson({ ...base, content_type: 'document', content: '{not json' })).toBe(false);
+  });
+
+  it('accepts a document row whose content parses as JSON, regardless of shape', () => {
+    // The DB check is syntactic JSON only; lib/document/schema.ts owns the
+    // node/mark schema, so a syntactically valid but semantically wrong
+    // document is this constraint's problem to allow and the application's
+    // problem to have rejected before it was ever written.
+    expect(documentContentIsJson({ ...base, content_type: 'document', content: '{"anything":true}' })).toBe(true);
+  });
+
+  it('does not require document content to be JSON when encrypted or burned', () => {
+    expect(
+      documentContentIsJson({ ...base, content_type: 'document', is_encrypted: true, content: null }),
+    ).toBe(true);
+    expect(documentContentIsJson({ ...base, content_type: 'document', content: null })).toBe(true);
   });
 });

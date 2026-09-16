@@ -11,6 +11,9 @@ const config = [
       'playwright-report/**',
       'test-results/**',
       'next-env.d.ts',
+      // Monaco's own prebuilt bundle, copied here by
+      // scripts/copy-monaco-assets.mjs — not this project's source.
+      'public/monaco-editor/**',
     ],
   },
   ...coreWebVitals,
@@ -31,8 +34,8 @@ const config = [
     },
   },
   {
-    // Tests and config files run outside the app runtime.
-    files: ['tests/**/*.ts', '*.config.ts', '*.config.mjs'],
+    // Tests, config and build scripts run outside the app runtime.
+    files: ['tests/**/*.ts', '*.config.ts', '*.config.mjs', 'scripts/**/*.mjs'],
     rules: { 'no-console': 'off' },
   },
 ];

@@ -9,12 +9,11 @@ export const metadata: Metadata = {
 
 export default function RecentPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mb-6">
-        <h1 className="font-mono text-lg font-semibold tracking-tight">Your recent pastes</h1>
-        <p className="text-sm text-text-muted">
-          Stored in this browser only. Nothing here is a public feed, and the server keeps no list of who
-          created what.
+    <div className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-5 sm:py-6">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="text-[17px] font-semibold tracking-[-0.02em]">Recent pastes</h1>
+        <p className="text-xs text-text-subtle">
+          This browser only. The server keeps no list of who created what.
         </p>
       </div>
       <RecentPasteList />
