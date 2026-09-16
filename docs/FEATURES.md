@@ -1,124 +1,140 @@
-# Features
+# Feature reference
 
-Status key: **Implemented** — working and tested · **Partial** — usable with a documented limit ·
-**Planned** — not built.
+This is the user-visible capability matrix for TinyPaste.
 
-## Creating
+**Status:** ✅ implemented and covered · ◐ implemented with an operational or testing limitation ·
+— intentionally unsupported · ◌ planned.
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Paste text, code, logs, config | Implemented | Up to 1 MiB, measured in UTF-8 bytes |
-| Optional title | Implemented | 120 characters, trimmed; blank becomes untitled |
-| Language selection | Implemented | 32 languages, always manually selectable |
-| Automatic language detection | Planned | Deliberately skipped — unreliable detection is worse than a default |
-| Expiry | Implemented | 10 min / 1 h / 1 day / 7 days / 30 days / never |
-| Custom expiry value | Planned | The closed enum means the server never trusts a client timestamp |
-| Password protection | Implemented | bcrypt cost 12, rate limited |
-| Burn after reading | Implemented | Atomic, explicit-consent reveal |
-| Browser-side encryption | Implemented | AES-GCM 256, key in the URL fragment |
-| Encryption **and** password together | Not supported | Deliberate in v1; see SECURITY.md |
-| JSON formatting before saving | Implemented | Opt-in button, never automatic |
-| Size and character counter | Implemented | Turns red past the limit |
-| Drag-and-drop file upload | Planned | |
+## Authoring
 
-## Viewing
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Code mode | ✅ | Monaco editor with language-aware editing and cursor position |
+| Plain-text mode | ✅ | Monaco without syntax highlighting; language is fixed to plain text |
+| Document mode | ✅ | Tiptap editor with validated structured output |
+| Title | ✅ | Optional, trimmed, maximum 120 characters |
+| Payload size | ✅ | Maximum 1 MiB, measured as UTF-8 bytes or encrypted payload bytes |
+| Languages | ✅ | 32 manually selected code/text languages |
+| Automatic language detection | ◌ | Not implemented; manual selection is deterministic |
+| JSON formatting | ✅ | Explicit action in code mode; content is never reformatted silently |
+| Mode switching before creation | ✅ | Code/text converts to document paragraphs; documents flatten to text |
+| Drag-and-drop files | ◌ | Not implemented |
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Syntax highlighting | Implemented | Shiki tokens as React elements; one grammar loaded per page |
-| Line numbers | Implemented | Sticky gutter, horizontal scroll for long lines |
-| Copy content | Implemented | Original plaintext, never the highlighted markup |
-| Copy link | Implemented | Encrypted links always include the `#key` |
-| Raw view | Implemented | Server route for plain pastes; in-page toggle for protected ones |
-| Download | Implemented | Server route for plain pastes; local blob for protected ones |
-| Fork | Implemented | Only after successful unlock or decryption |
-| QR code | Implemented | Generated locally; never sent to a third-party service |
-| View counter | Implemented | One integer, no per-view records |
-| Relative and absolute timestamps | Implemented | UTC storage, rendered in the visitor's timezone |
-| Rendered Markdown preview | Planned | Would need careful sanitisation; source highlighting for now |
-| Paste diffing | Planned | |
+### Document formatting
 
-## Ownership
+Document mode supports paragraphs; headings 1–3; bold, italic, underline, strike, and inline code;
+bulleted and numbered lists; blockquotes; code blocks; horizontal rules; safe links; left, centre,
+right, and justified alignment; text colour; highlights; hard breaks; undo; and redo.
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Edit token on creation | Implemented | 256 bits, SHA-256 at rest, shown once |
-| Edit a paste | Implemented | Title, content, language, expiry |
-| Edit an encrypted paste | Implemented | Decrypted and re-encrypted locally with the fragment key |
-| Edit a burn-after-read paste | Not supported | Meaningless — the payload is destroyed on first read |
-| Change the security mode by editing | Not supported | Prevents an unrecoverable ciphertext → plaintext downgrade |
-| Delete a paste | Implemented | Confirmation dialog, server-verified token |
-| Delete an expired or burned paste | Implemented | Deletion bypasses the read gate, so a leftover record is never stranded |
-| Recent pastes | Implemented | Per browser; there is no server-side listing API at all |
-| Forget a paste locally | Implemented | Removes the local record without deleting the paste |
-| Clear local history | Implemented | With confirmation |
-| Accounts | Planned | |
+Documents are stored as a closed ProseMirror JSON subset. Node count, nesting, attributes, link
+schemes, and CSS colours are validated before plaintext documents are stored. Encrypted documents
+are validated in the browser before encryption and again after decryption.
 
-## Interface
+## Lifetime and access
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Light / dark / system themes | Implemented | Inline bootstrap script, no flash |
-| Mobile layout | Implemented | Verified at 375, 768 and 1440 px |
-| Keyboard shortcuts | Implemented | `Ctrl`/`Cmd`+`Enter` create, `Ctrl`/`Cmd`+`Shift`+`C` copy |
-| Command palette | Implemented | `Ctrl`/`Cmd`+`K` |
-| Toasts | Implemented | Duplicates collapse rather than stack |
-| Loading states | Implemented | Buttons disable during work; no duplicate submissions |
-| Error states | Implemented | Not found, expired, burned, locked, wrong password, missing key, decryption failed, rate limited, too large, invalid slug, server error |
-| Accessibility | Implemented | Semantic HTML, labelled inputs, visible focus, ARIA only where needed, status never conveyed by colour alone |
-| Skip-to-content link | Implemented | |
-| Screen-reader audit | Partial | Built to the standards above; not yet tested with a real screen reader |
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Expiration | ✅ | 10 min, 1 h, 1 d, 7 d, 30 d, or never; default is 7 d |
+| Custom expiration | ◌ | Not implemented; the API accepts only the closed option set |
+| Link-only access | ✅ | Anyone with the unguessable URL can read |
+| Password protection | ✅ | bcrypt cost 12; unlock attempts are rate limited |
+| Burn after reading | ✅ | Explicit reveal; one atomic winner; payload wiped on consumption |
+| Browser encryption | ✅ | AES-256-GCM; key lives in the URL fragment |
+| Password + browser encryption | — | Mutually exclusive in the current storage format |
+| Edit a burn paste | — | Disallowed because its payload is designed to disappear |
+
+Creating a burn paste does not consume it. The creator first sees a warning; a reader must choose
+**Reveal and destroy**. Raw and download routes refuse burn pastes rather than consuming them.
+
+## Reading and sharing
+
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Syntax highlighting | ✅ | Shiki token output rendered as React elements |
+| Line numbers | ✅ | Sticky gutter with horizontal scrolling for long lines |
+| Rich-document rendering | ✅ | Validated JSON is walked directly into React elements |
+| Copy | ✅ | Source text, plain text, or rich HTML with a plain-text fallback |
+| Copy link | ✅ | Preserves the fragment key for encrypted pastes |
+| Raw route | ✅ | Available for unprotected code/text; inert `text/plain` response |
+| Download route | ✅ | Available for unprotected code/text; attachment with safe filename |
+| Document export | ✅ | Browser-generated HTML and Markdown; raw/download server routes refuse documents |
+| Fork | ✅ | Starts a new paste from content already revealed or decrypted |
+| QR code | ✅ | Generated locally; the complete encrypted URL never reaches a QR service |
+| View count | ✅ | Aggregate integer only; no per-view application records |
+| Timestamps | ✅ | Stored in UTC, shown in the visitor's local timezone |
+| Rendered Markdown mode | ◌ | Document mode is the rich-format path; Markdown code stays source |
+| Diff/version history | ◌ | Not implemented |
+
+## Ownership without accounts
+
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Edit token | ✅ | 256 random bits; returned once; SHA-256 digest stored server-side |
+| Edit | ✅ | Title, content, language where applicable, and renewed expiration |
+| Edit encrypted content | ✅ | Decrypts and re-encrypts locally with the fragment key |
+| Change content type after creation | — | Fixed to prevent reinterpretation of stored bytes |
+| Change security mode after creation | — | Fixed to prevent downgrade and recovery ambiguity |
+| Delete | ✅ | Confirmation plus server-side edit-token verification |
+| Delete expired/burned record | ✅ | Owner deletion bypasses read state but never token verification |
+| Recent pastes | ✅ | Maximum 200 entries in the current browser's local storage |
+| Forget local entry | ✅ | Does not delete the server paste |
+| Clear local history | ✅ | Removes browser records after confirmation |
+| Accounts and synchronised history | ◌ | Not implemented |
+
+Clearing site data or changing browsers loses edit access. There is no recovery channel because the
+raw token is not stored by the server.
+
+## Interface and accessibility
+
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Themes | ✅ | Light, dark, and system; pre-paint bootstrap avoids a theme flash |
+| Responsive layout | ✅ | Desktop, tablet, and mobile layouts |
+| Create shortcut | ✅ | `Ctrl/Cmd + Enter` |
+| Copy shortcut | ✅ | `Ctrl/Cmd + Shift + C` where the paste action is available |
+| Command palette | ✅ | `Ctrl/Cmd + K` |
+| Loading/error states | ✅ | Duplicate actions disabled; typed user-facing failures |
+| Keyboard focus | ✅ | Visible focus styles, labelled controls, skip-to-content link |
+| Real screen-reader audit | ◐ | Semantic implementation exists; no documented assistive-tech audit yet |
 
 ## Security and privacy
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Pasted content never executes | Implemented | Structural: no HTML string in the render path |
-| Inert raw and download responses | Implemented | `nosniff`, `text/plain` / octet-stream, `default-src 'none'; sandbox` |
-| Centralised expiry enforcement | Implemented | One gate every read path passes through |
-| Atomic burn | Implemented | `SELECT … FOR UPDATE` in Postgres; tested with concurrent claims |
-| Password hashing | Implemented | bcrypt cost 12 |
-| Edit-token hashing | Implemented | SHA-256, constant-time comparison |
-| Server-side validation | Implemented | Zod at every boundary |
-| Rate limiting | Implemented | In-memory by default |
-| Distributed rate limiting | Partial | Upstash adapter written; needs credentials to activate |
-| Security headers | Implemented | CSP, nosniff, frame denial, no-referrer, permissions policy |
-| Nonce-based CSP | Planned | Would need per-request middleware; `'unsafe-inline'` for now |
-| Row Level Security | Implemented | Enabled with no policies; anon key cannot read anything |
-| Safe logging | Implemented | Redacting logger; `no-console` lint rule |
-| Filename sanitisation | Implemented | Traversal, control characters and header injection |
-| `noindex` on paste pages | Implemented | Plus generic metadata, so link previews leak nothing |
-| No analytics or third-party scripts | Implemented | CSP blocks cross-origin connections outright |
-| Privacy and About pages | Implemented | Including limits the app cannot guarantee |
-| Report abuse | Partial | `mailto:` link; no moderation workflow |
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Non-executable paste content | ✅ | No user HTML is injected in code or document read paths |
+| Server validation | ✅ | Zod at request boundaries plus database constraints |
+| Central read policy | ✅ | Expiry, password, and burn rules converge in the service layer |
+| Safe exports | ✅ | Inert content types, strict export CSP, sanitised filenames |
+| Row Level Security | ✅ | Enabled and forced; browser roles have no policies or table privileges |
+| Rate limiting | ✅ | Local fixed-window implementation |
+| Distributed rate limiting | ◐ | Upstash adapter activates only when its credentials are configured |
+| Secure metadata | ✅ | Paste pages are `noindex`; titles are excluded from page metadata |
+| Redacted logging | ✅ | Sensitive field names are removed; payloads are not passed to logs |
+| Analytics/third-party scripts | ✅ | None; CSP restricts connections to the same origin |
+| Abuse reporting | ◐ | Configurable email link, not a moderation queue |
+| Nonce-based CSP | ◌ | Current Next.js-compatible policy permits inline scripts/styles |
 
-## Operations
+The detailed guarantees and exclusions are in [SECURITY.md](SECURITY.md).
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Supabase repository | Implemented | Service-role, server-only |
-| In-memory repository | Implemented | Dev and E2E; refused in production without an explicit flag |
-| Volatile-storage banner | Implemented | So a demo cannot be mistaken for durable storage |
-| Expired-row cleanup | Implemented | `POST /api/cleanup` plus a `pg_cron` recipe |
-| Structured JSON API | Implemented | Consistent error shape, closed code set |
-| Public documented API | Planned | Endpoints exist but carry no stability guarantee |
-| API keys | Planned | |
-| Migrations | Implemented | `supabase/migrations/0001_init.sql` |
+## Operations and quality
 
-## Testing
-
-| Area | Status | Notes |
-| --- | --- | --- |
-| Unit tests | Implemented | 225 tests over slugs, expiry, crypto, filenames, tokens, passwords, validation, rate limiting, headers, repository, service |
-| E2E tests | Implemented | 49 tests over create, view, export, fork, password, burn, encryption, ownership, headers, XSS |
-| Burn concurrency | Implemented | 20 simultaneous service claims; 2 simultaneous HTTP reveals |
-| Encryption leak checks | Implemented | Every request URL, body and header asserted free of key and plaintext |
-| Cross-browser E2E | Partial | Chromium only |
-| Load testing | Planned | |
+| Capability | Status | Behaviour |
+| --- | :---: | --- |
+| Supabase storage | ✅ | Server-only service-role repository |
+| In-memory storage | ✅ | Development/E2E fallback with a visible warning |
+| Production memory guard | ✅ | Refuses volatile storage without explicit opt-in |
+| Expired-row cleanup | ✅ | Authenticated POST route and a direct PostgreSQL helper |
+| Schema migrations | ✅ | Base schema plus content-type migration |
+| Stable public API | ◌ | Internal JSON endpoints exist but carry no compatibility promise |
+| Unit suite | ✅ | 272 tests across 12 files at this revision |
+| End-to-end suite | ✅ | 65 Chromium tests across 5 files at this revision |
+| Cross-browser E2E | ◐ | Playwright currently runs Chromium only |
+| Load testing | ◌ | Not implemented |
 
 ## Roadmap
 
-Optional accounts · paste collections · API keys and a documented public API · CLI client · browser
-extension · webhooks on creation · collaborative editing · custom expiry values · custom domains ·
-encrypted file sharing · paste diffing and version history · report-and-moderation workflow ·
-self-hosting guides.
+Potential future work includes accounts, synchronised collections, API keys and a versioned public
+API, a CLI, browser extensions, custom expirations and domains, file sharing, diffs and revisions,
+webhooks, collaborative editing, a moderation workflow, cross-browser coverage, and load testing.
+
+Roadmap items are directions, not commitments.

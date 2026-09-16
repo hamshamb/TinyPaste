@@ -1,229 +1,283 @@
 # Supabase setup
 
-TinyPaste runs without Supabase — it falls back to a volatile in-memory store and says so in a
-banner. This guide switches it to durable storage. Allow about ten minutes.
+TinyPaste can run locally without a database, but durable storage requires Supabase PostgreSQL.
+This guide creates a project, applies both migrations, and verifies that browser-facing roles cannot
+read paste rows.
 
-## 1. Create a project
+## What you need
 
-1. Sign in at <https://supabase.com/dashboard>.
-2. **New project**. Pick an organisation, a name (`tinypaste`), and a region close to your users.
-3. Set a database password and store it in a password manager. TinyPaste never uses it directly —
-   it connects through the REST API — but you need it for `psql` and the CLI.
-4. Wait for provisioning (one to two minutes).
+- A Supabase account and a new or disposable project.
+- Access to the project's SQL Editor, or the Supabase CLI.
+- The TinyPaste repository installed locally.
 
-## 2. Find the project URL
+Keep development and production in separate Supabase projects. Paste rows are user data; sharing a
+database across environments makes testing, retention, and incident response unnecessarily risky.
 
-**Project Settings → Data API → Project URL.**
+## 1. Create the project
 
-It looks like `https://abcdefghijklmnopqrst.supabase.co`. This is
-`NEXT_PUBLIC_SUPABASE_URL`.
+1. Open <https://supabase.com/dashboard> and choose **New project**.
+2. Select an organisation, project name, and a region close to users.
+3. Generate a strong database password and save it in a password manager.
+4. Wait for provisioning to finish.
 
-## 3. Find the anon key
+TinyPaste uses Supabase's server-side client rather than a direct connection string, but the
+database password remains important for CLI and emergency administration.
 
-**Project Settings → API Keys → `anon` / `public`.**
+## 2. Collect credentials
 
-This is `NEXT_PUBLIC_SUPABASE_ANON_KEY`. TinyPaste does not query the database from the browser, so
-it is not strictly required — it is listed for completeness and future use. Row Level Security
-denies this key access to the `pastes` table entirely (step 6).
+In project settings, copy:
 
-## 4. Find the service role key
+| Setting | TinyPaste variable | Sensitivity |
+| --- | --- | --- |
+| Project URL | `NEXT_PUBLIC_SUPABASE_URL` | Public identifier |
+| Anon/public key | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public, but intentionally powerless |
+| Service-role/secret key | `SUPABASE_SERVICE_ROLE_KEY` | **Secret; bypasses RLS** |
 
-**Project Settings → API Keys → `service_role` / `secret`.** Reveal and copy it.
+Supabase dashboard labels can vary between legacy and newer key formats. Use the key documented as
+server-side/secret/service-role—not a publishable key—for `SUPABASE_SERVICE_ROLE_KEY`.
 
-This is `SUPABASE_SERVICE_ROLE_KEY`.
+Never:
 
-> **This key bypasses Row Level Security.** Treat it like a database password.
-> - Never prefix it with `NEXT_PUBLIC_`.
-> - Never import it into a client component.
-> - Never commit it. `.env.local` is already in `.gitignore`.
->
-> In TinyPaste it is read only through `lib/config/env.ts`, which is imported exclusively by
-> `server-only` modules, so a client component that tried to reach it would fail the build.
+- prefix the service-role variable with `NEXT_PUBLIC_`;
+- paste it into browser code or a public issue;
+- commit it to the repository;
+- reuse a production service-role key in preview deployments you do not trust.
 
-## 5. Fill in the environment file
+## 3. Configure local environment
 
 ```bash
 cp .env.example .env.local
 ```
 
-Then edit `.env.local`:
+Fill the values:
 
-```
-NEXT_PUBLIC_SUPABASE_URL=https://abcdefghijklmnopqrst.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_OR_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_OR_SECRET_KEY
 APP_URL=http://localhost:3000
 ```
 
-The app auto-detects Supabase as soon as the URL and service-role key are both present. No further
-switch is needed.
+The app chooses Supabase automatically when the URL and service-role key are both present. If
+`TINYPASTE_DB_DRIVER` is set, either remove it or set it to `supabase`.
 
-## 6. Run the migration
+Restart the development server after changing environment variables.
 
-The migration creates the `pastes` table, its indexes and constraints, the atomic burn function, the
-view counter, the cleanup helper, and the RLS configuration.
+## 4. Apply migrations
 
-### Option A — SQL editor (no tooling)
+Apply every SQL file in `supabase/migrations/` in filename order:
 
-1. Open **SQL Editor → New query** in the dashboard.
-2. Paste the entire contents of `supabase/migrations/0001_init.sql`.
-3. **Run**. It should report success with no rows returned.
+1. `0001_init.sql` — base table, indexes, constraints, RLS, privileges, atomic burn, view counter,
+   and cleanup function.
+2. `0002_content_types.sql` — code/plain-text/document discriminator, legacy backfill, and document
+   JSON syntax constraint.
 
-### Option B — Supabase CLI
+### Option A: dashboard SQL Editor
 
-```bash
-npm install -D supabase
-```
+For each file in order:
+
+1. Open **SQL Editor → New query**.
+2. Paste the complete file.
+3. Choose **Run** and confirm success before continuing.
+
+Do not apply only `0002`; it alters the table created by `0001`.
+
+### Option B: Supabase CLI
+
+With the CLI available:
 
 ```bash
 npx supabase login
-```
-
-```bash
-npx supabase link --project-ref abcdefghijklmnopqrst
-```
-
-```bash
+npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
 
-`--project-ref` is the subdomain from your project URL. `db push` applies everything in
-`supabase/migrations/` in filename order.
+`YOUR_PROJECT_REF` is the subdomain in the project URL. `db push` applies pending migrations in
+order and records their versions.
 
-## 7. Confirm the table exists
+## 5. Verify schema and migrations
 
-**Table Editor → `pastes`.** You should see the columns, with zero rows.
-
-Or from the SQL editor:
+Confirm the table and content-type column:
 
 ```sql
-select column_name, data_type, is_nullable
+select column_name, data_type, is_nullable, column_default
   from information_schema.columns
- where table_name = 'pastes'
+ where table_schema = 'public'
+   and table_name = 'pastes'
  order by ordinal_position;
 ```
 
-Confirm the functions were created too:
+Confirm both migration versions through the CLI:
+
+```bash
+npx supabase migration list
+```
+
+Confirm the helper functions:
 
 ```sql
 select routine_name
   from information_schema.routines
  where routine_schema = 'public'
-   and routine_name in ('consume_burn_paste', 'increment_paste_views', 'delete_expired_pastes');
+   and routine_name in (
+     'consume_burn_paste',
+     'increment_paste_views',
+     'delete_expired_pastes'
+   )
+ order by routine_name;
 ```
 
-Three rows.
+Expected: three rows.
 
-## 8. Confirm Row Level Security
-
-The migration already configures this; step 8 is verification.
+Check the critical constraints:
 
 ```sql
-select relname, relrowsecurity, relforcerowsecurity
+select conname
+  from pg_constraint
+ where conrelid = 'public.pastes'::regclass
+ order by conname;
+```
+
+The result should include payload-shape, encryption/password, burn-state, content-type, and document
+JSON constraints.
+
+## 6. Verify Row Level Security
+
+This is a release blocker. TinyPaste intentionally creates no browser-readable policies.
+
+```sql
+select relrowsecurity, relforcerowsecurity
   from pg_class
- where relname = 'pastes';
+ where oid = 'public.pastes'::regclass;
 ```
 
-Both booleans must be `true`.
+Both values must be `true`.
 
 ```sql
-select count(*) from pg_policies where tablename = 'pastes';
+select count(*)
+  from pg_policies
+ where schemaname = 'public'
+   and tablename = 'pastes';
 ```
 
-Must be **0**. That is intentional: RLS on with no policies denies every request made with the anon
-or authenticated key. TinyPaste reaches the table only server-side with the service-role key, which
-bypasses RLS.
+Expected: `0`.
 
-Table privileges are a second, independent layer. Confirm `anon` and `authenticated` hold none:
+RLS is reinforced by table privileges:
 
 ```sql
 select grantee, privilege_type
   from information_schema.role_table_grants
- where table_name = 'pastes'
- order by grantee;
+ where table_schema = 'public'
+   and table_name = 'pastes'
+ order by grantee, privilege_type;
 ```
 
-`anon` and `authenticated` must not appear. `service_role` should show SELECT, INSERT, UPDATE and
-DELETE.
+`anon` and `authenticated` must not appear. `service_role` should have SELECT, INSERT, UPDATE,
+and DELETE.
 
-Finally, confirm the helper functions are not callable by the browser-facing roles:
+Finally, verify helper-function execution:
 
 ```sql
 select p.proname,
-       has_function_privilege('anon',   p.oid, 'execute') as anon_can_execute,
+       has_function_privilege('anon', p.oid, 'execute') as anon_can_execute,
+       has_function_privilege('authenticated', p.oid, 'execute') as authenticated_can_execute,
        has_function_privilege('public', p.oid, 'execute') as public_can_execute,
        has_function_privilege('service_role', p.oid, 'execute') as service_role_can_execute
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
-   and p.proname in ('consume_burn_paste', 'increment_paste_views', 'delete_expired_pastes');
+   and p.proname in (
+     'consume_burn_paste',
+     'increment_paste_views',
+     'delete_expired_pastes'
+   )
+ order by p.proname;
 ```
 
-All three rows must read `false, false, true`. If `anon_can_execute` is true, the migration's
-function revokes did not apply — PostgreSQL grants EXECUTE to PUBLIC by default and every role
-inherits it, so a revoke that names only `anon` and `authenticated` silently leaves access in place.
+Each row should read `false, false, false, true` across the four role checks. PostgreSQL grants
+function execution to `PUBLIC` by default, which is why the migration explicitly revokes it.
 
-Verify from outside, substituting your project URL and anon key:
+## 7. Test the browser-facing key
+
+From a terminal, substitute your project URL and anon/publishable key:
 
 ```bash
-curl -s "https://abcdefghijklmnopqrst.supabase.co/rest/v1/pastes?select=*" -H "apikey: YOUR_ANON_KEY"
+curl -i "https://YOUR_PROJECT_REF.supabase.co/rest/v1/pastes?select=*" \
+  -H "apikey: YOUR_ANON_OR_PUBLISHABLE_KEY"
 ```
 
-An empty array or a permission error is correct. If it returns paste rows, **stop** — RLS is not
-applied, and anyone with the anon key can read every paste.
+An empty result or permission error is acceptable. Returned paste rows are not—stop deployment and
+reapply/review the RLS and privilege block in `0001_init.sql`.
 
-## 9. Start the app
+## 8. Start TinyPaste
 
 ```bash
 npm run dev
 ```
 
-Open <http://localhost:3000>. The amber "Temporary storage" banner should be **gone**. If it is
-still there, the app did not detect Supabase — check for typos and restart the dev server, since
-environment variables are read at startup.
+Open <http://localhost:3000>. The **Temporary storage** banner should be absent. If it remains:
 
-## 10. Verify creation and retrieval
+1. confirm both required Supabase variables are spelled correctly;
+2. confirm `.env.local` is at the repository root;
+3. check whether `TINYPASTE_DB_DRIVER=memory` is forcing the fallback;
+4. restart the server.
 
-1. Create a paste with a recognisable title.
-2. Confirm it opens at its `/p/<slug>` link.
-3. In **Table Editor → `pastes`**, confirm the row exists and that `edit_token_hash` is a 64-character
-   hex digest — not a token you recognise.
-4. Create a password-protected paste. Confirm `password_hash` starts with `$2` and that the password
-   itself appears nowhere.
-5. Create an encrypted paste. Confirm `content` is `NULL`, `encrypted_content` holds base64 that does
-   not resemble your text, and `is_encrypted` is `true`.
-6. Create a burn-after-read paste, open the link in a private window, reveal it, then reload.
-   The second load should say the paste is no longer available, and the row's `content` should be
-   `NULL` with `burned_at` set.
-7. Restart the dev server and reopen an earlier paste. It should still be there — that is the
-   difference from in-memory mode.
+## 9. Functional verification
 
-## Optional: scheduled cleanup
+Create one paste for each important storage path:
 
-Expiry is enforced in application code, so this is housekeeping only — it stops expired rows
-lingering at rest.
+- [ ] **Code:** row has `content_type = 'code'`; raw/download work.
+- [ ] **Plain text:** row has `content_type = 'plaintext'`.
+- [ ] **Document:** row has `content_type = 'document'`; `content` is valid JSON; document export
+      works while raw/download are refused.
+- [ ] **Password:** `password_hash` starts with a bcrypt prefix and plaintext password is absent.
+- [ ] **Encrypted:** `content IS NULL`, ciphertext/IV are populated, and the complete link decrypts
+      in the browser.
+- [ ] **Encrypted document:** database contains ciphertext rather than readable document JSON.
+- [ ] **Burn:** first explicit reveal succeeds; reload is unavailable; payload columns are null and
+      `burned_at` is populated.
+- [ ] **Ownership:** `edit_token_hash` is a 64-character hex digest; the creating browser can edit
+      and delete.
+- [ ] **Durability:** restart the app and confirm a normal paste still opens.
 
-Enable `pg_cron` under **Database → Extensions**, then:
+## 10. Schedule expired-row cleanup
+
+Expiry checks do not depend on cleanup, but expired data should not remain at rest indefinitely.
+The simplest scheduler is PostgreSQL itself.
+
+Enable the `pg_cron` extension in **Database → Extensions**, then run:
 
 ```sql
 select cron.schedule(
-  'tinypaste-cleanup',
+  'tinypaste-delete-expired',
   '0 * * * *',
   $$ select public.delete_expired_pastes(); $$
 );
 ```
 
-Alternatively, set `CLEANUP_SECRET` and call `POST /api/cleanup` with
-`Authorization: Bearer <secret>` from a Vercel Cron job — see [DEPLOYMENT.md](DEPLOYMENT.md).
+Verify the schedule:
+
+```sql
+select jobid, jobname, schedule, command, active
+  from cron.job
+ where jobname = 'tinypaste-delete-expired';
+```
+
+Alternatively, set `CLEANUP_SECRET` and use an external scheduler that can send an authenticated
+`POST /api/cleanup`. Standard Vercel Cron requests are GET requests, so they cannot call this POST
+route directly without an intermediary.
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
+| Symptom | Likely cause | Resolution |
 | --- | --- | --- |
-| Banner still says "Temporary storage" | Variables not loaded | Check `.env.local` spelling; restart the dev server |
-| `STORAGE_UNAVAILABLE` on create | `TINYPASTE_DB_DRIVER=supabase` without credentials | Fill both variables, or unset the driver |
-| `relation "public.pastes" does not exist` | Migration not run | Redo step 6 |
-| `Could not find the function public.consume_burn_paste` | Partial migration | Re-run the whole file; `create or replace` is idempotent |
-| `new row violates check constraint "pastes_payload_shape"` | A row with both plaintext and ciphertext | A client bypassing validation; check the API caller |
-| `permission denied for table pastes` | Using the anon key server-side | `SUPABASE_SERVICE_ROLE_KEY` is missing or wrong |
-| Anon `curl` returns rows | RLS not applied | Re-run the RLS block in the migration immediately |
+| Temporary-storage banner remains | Variables not loaded or memory driver forced | Correct `.env.local`, remove forced driver, restart |
+| `STORAGE_UNAVAILABLE` | Supabase driver lacks usable credentials | Set URL + service role together |
+| `relation public.pastes does not exist` | Base migration missing | Apply `0001_init.sql` |
+| `column content_type does not exist` | Second migration missing | Apply `0002_content_types.sql` |
+| Missing burn/view/cleanup function | Partial base migration | Reapply the complete `0001` migration |
+| Payload-shape constraint failure | Request tried to store plaintext and ciphertext together | Inspect the caller and validation path |
+| Content-type constraint failure | Unknown content type or stale custom client | Send `code`, `plaintext`, or `document` |
+| Document JSON constraint failure | Plaintext document payload is not valid JSON | Use the product editor/API schema |
+| Permission denied for `pastes` | Server is using anon key | Correct `SUPABASE_SERVICE_ROLE_KEY` |
+| Anon REST request returns rows | RLS/privileges are unsafe | Take the app offline and restore the migration security block |

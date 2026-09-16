@@ -1,217 +1,252 @@
 # Architecture
 
-## Shape of the system
+TinyPaste is a Next.js App Router application with a deliberately narrow server core. Pages and API
+handlers translate HTTP; one service module owns product policy; a repository interface isolates
+storage. The browser owns editing, local history, client-side encryption, and rich-document export.
+
+## System map
 
 ```mermaid
 flowchart TB
     subgraph Browser
         UI[React client components]
-        LS[(localStorage<br/>history + edit tokens)]
+        ME[Monaco editor]
+        TE[Tiptap editor]
         WC[Web Crypto]
+        LS[(localStorage<br/>history + edit tokens)]
     end
 
-    subgraph Server["Next.js server"]
+    subgraph Server["Next.js / Node.js"]
         RSC[Server components]
-        RH[Route handlers]
-        SVC[lib/paste/service.ts<br/>access control]
-        REPO[PasteRepository]
+        API[Route handlers]
+        VAL[Zod + request guards]
+        SVC[Paste service<br/>business and access policy]
+        REP[PasteRepository]
     end
 
     DB[(Supabase PostgreSQL)]
-    MEM[(In-memory store<br/>dev / E2E)]
+    MEM[(Memory repository<br/>development and E2E)]
 
-    UI -->|fetch JSON| RH
-    UI --- LS
+    UI --- ME
+    UI --- TE
     UI --- WC
+    UI --- LS
+    UI -->|fetch JSON| API
     RSC --> SVC
-    RH --> SVC
-    SVC --> REPO
-    REPO --> DB
-    REPO -.-> MEM
+    API --> VAL --> SVC
+    SVC --> REP
+    REP --> DB
+    REP -.-> MEM
 ```
 
-Every read and write passes through `lib/paste/service.ts`. That is the design's load-bearing
-decision: expiry, burn state, password verification and edit-token authorisation live in one module,
-so an individual route cannot forget one of them.
+## Design rules
 
-## Layers
+1. **Routes do not own business rules.** They parse a request, call the service, and format a result.
+2. **Every readable row passes one gate.** `loadPasteRecord()` applies slug, existence, expiry, and
+   burn-state checks before content-specific policy runs.
+3. **Storage does not know HTTP.** Repository implementations receive typed records and return typed
+   records.
+4. **Secrets are projected, not subtracted.** Client metadata is assembled from an explicit field
+   list; hashes and internal IDs never enter a response object.
+5. **Content type is immutable.** Code, plain text, and document payloads cannot be reinterpreted by
+   an edit.
+6. **Security mode is immutable.** Encryption, password, and burn flags cannot be downgraded later.
+
+## Layers and ownership
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Routes | `app/**` | HTTP shape only — parse params, call the service, format the response |
-| Guards | `lib/api/guards.ts` | Same-origin check, rate limiting, edit-token extraction |
-| Validation | `lib/validation/paste.ts` | Zod schemas at every server boundary |
-| Service | `lib/paste/service.ts` | All access rules, all business logic |
-| Repository | `lib/db/*` | Storage, and nothing else |
-| Client helpers | `lib/client/*` | Browser-only concerns: history, fetch, clipboard, theme |
+| Pages and routes | `app/**` | URL shape, request parsing, status/response formatting |
+| UI | `components/**` | Authoring, gates, rendering, actions, accessible interaction |
+| API guards | `lib/api/**` | Same-origin checks, rate-limit entry points, edit-token extraction |
+| Validation | `lib/validation/paste.ts` | Closed request schemas and byte limits |
+| Service | `lib/paste/service.ts` | Creation, access control, ownership, expiry, burn, mutation |
+| Document domain | `lib/document/**` | Closed JSON schema, safe links/colours, exports, plain-text conversion |
+| Repository | `lib/db/**` | Storage contract, Supabase adapter, memory adapter |
+| Security | `lib/security/**` | Passwords, tokens, headers, rate limits, safe logging |
+| Browser helpers | `lib/client/**` | API calls, local history, clipboard, theme, fork state |
 
-Nothing below the service layer knows about HTTP; nothing above it knows about SQL.
+## Content model
 
-## Request flows
+A paste has one immutable `contentType`:
 
-### Creating a paste
+- `code`: a source string plus one of the supported language IDs.
+- `plaintext`: an unhighlighted string; language is `plaintext`.
+- `document`: `JSON.stringify` output from a closed ProseMirror schema.
+
+The document schema recognises only known nodes and marks. It enforces safe URL protocols, safe CSS
+colours, bounded text and arrays, a maximum depth of 64, and a maximum of 20,000 nodes. The reader
+walks the validated structure directly into React elements. No stored HTML is rendered.
+
+Encrypted pastes use the same logical content model, but the server sees only ciphertext. Document
+JSON is validated before browser encryption and after browser decryption.
+
+## Create flow
 
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant R as POST /api/pastes
-    participant S as Service
-    participant D as Repository
+    participant A as POST /api/pastes
+    participant S as Paste service
+    participant R as Repository
 
-    B->>B: If encrypting, AES-GCM the plaintext first
-    B->>R: { title, language, expiration, content | ciphertext+iv }
-    R->>R: Same-origin check, rate limit, Zod parse
-    R->>S: createPaste(input)
-    S->>S: Generate slug + 256-bit edit token
-    S->>S: bcrypt the password (if any), SHA-256 the token
-    S->>D: insert
-    D-->>S: row (retry with a new slug on unique violation)
-    S-->>R: { slug, url, editToken, meta }
-    R-->>B: 201
-    B->>B: Store the edit token locally, put the key in the fragment
+    B->>B: Build code/text or validated document payload
+    opt Browser encryption
+        B->>B: Generate AES-256 key + 96-bit IV
+        B->>B: Encrypt payload with AES-GCM
+    end
+    B->>A: Metadata + plaintext OR ciphertext/IV/version
+    A->>A: Origin guard, create rate limit, Zod parse
+    A->>S: createPaste(input)
+    S->>S: Generate slug and 256-bit edit token
+    S->>S: bcrypt password; SHA-256 edit token
+    S->>R: Insert typed record
+    R-->>S: Created row or slug collision
+    S-->>A: Slug, URL, metadata, one-time edit token
+    A-->>B: 201 Created
+    B->>B: Save edit token locally; append encryption key to fragment
 ```
 
-The raw edit token is returned exactly once and is never persisted.
+Creation retries with a fresh slug on a uniqueness collision. The raw edit token is returned exactly
+once; storage receives only its digest.
 
-### Reading a paste
+## Read decision tree
 
 ```mermaid
 flowchart TD
-    A[GET /p/slug] --> B{Slug valid?}
-    B -- no --> N[Paste not found]
-    B -- yes --> C{Row exists?}
-    C -- no --> N
-    C -- yes --> D{Expired?}
-    D -- yes --> E[This paste has expired]
-    D -- no --> F{Already burned?}
-    F -- yes --> G[No longer available]
-    F -- no --> H{Password set?}
-    H -- yes --> I[Render the password gate<br/>metadata only]
-    H -- no --> J{Burn after read?}
-    J -- yes --> K[Render the burn gate<br/>metadata only]
-    J -- no --> L[Deliver the body,<br/>count a view]
+    A[Load by slug] --> B{Valid slug and row exists?}
+    B -- No --> NF[Not found]
+    B -- Yes --> C{Expired?}
+    C -- Yes --> EX[Expired]
+    C -- No --> D{Already burned?}
+    D -- Yes --> BU[No longer available]
+    D -- No --> E{Password?}
+    E -- Yes --> PW[Metadata + password gate]
+    E -- No --> F{Burn after reading?}
+    F -- Yes --> BG[Metadata + reveal gate]
+    F -- No --> G[Return payload]
+    PW -->|Correct password via POST| G
+    BG -->|Explicit reveal via POST| H[Atomic consume + return payload]
+    G --> I{Encrypted?}
+    I -- Yes --> J[Browser decrypts fragment key]
+    I -- No --> K[Render directly]
+    J --> K
 ```
 
-The two gates are the reason the page is split: the server component renders metadata, and the body
-arrives only after a client-initiated `POST` that proves the visitor should have it.
+Password and burn gates keep the body out of the initial page source. A burn action is a POST so
+prefetchers, crawlers, and link previews cannot consume a paste with a GET.
 
-### Burn-after-read concurrency
+## Atomic burn
+
+The Supabase repository calls `consume_burn_paste()`. The function locks the matching row with
+`SELECT … FOR UPDATE`, rechecks `burned_at IS NULL`, captures the payload, and nulls stored
+content in the same transaction. Concurrent callers serialize on the row lock; exactly one gets the
+payload. The memory repository performs the check-and-wipe synchronously.
+
+For password-protected burn pastes, password verification happens before the atomic claim. Encrypted
+burn pastes are consumed when ciphertext is delivered; decryption then happens locally.
+
+## Browser-encryption boundary
 
 ```mermaid
-sequenceDiagram
-    participant A as Reader A
-    participant B as Reader B
-    participant P as Postgres
+flowchart LR
+    P[Plaintext or document JSON]
+    K[Random 256-bit key]
+    E[AES-GCM in browser]
+    C[Ciphertext + IV + version]
+    S[Server]
+    D[(Database)]
+    F["Share URL #k:key"]
 
-    A->>P: SELECT … FOR UPDATE WHERE burned_at IS NULL
-    B->>P: SELECT … FOR UPDATE WHERE burned_at IS NULL
-    P-->>A: row locked, returned
-    Note over B: blocked on the row lock
-    A->>P: UPDATE burned_at = now(), wipe payload
-    A->>P: COMMIT
-    P-->>B: re-evaluates WHERE against the updated row → no match
-    P-->>B: empty result
+    P --> E
+    K --> E
+    E --> C --> S --> D
+    K --> F
+    F -.->|never transmitted| S
 ```
 
-Under READ COMMITTED, a blocked `FOR UPDATE` re-checks its `WHERE` clause after the lock is
-released. `burned_at IS NULL` is now false, so reader B matches nothing. The in-memory
-implementation gets the same property from Node's single-threaded execution: the check and the wipe
-cannot interleave.
+The URL fragment is read through `window.location.hash`. It is not part of the request target,
+headers, body, cookies, or server logs. A site-wide `Referrer-Policy: no-referrer` also prevents the
+slug from being sent as referrer data.
 
-## Storage abstraction
+## Storage selection
 
-```ts
-interface PasteRepository {
-  driver: 'supabase' | 'memory';
-  create(record): Promise<PasteRecord | null>;   // null = slug collision
-  findBySlug(slug): Promise<PasteRecord | null>;
-  update(slug, patch): Promise<PasteRecord | null>;
-  delete(slug): Promise<boolean>;
-  consumeBurn(slug): Promise<BurnedContent | null>; // atomic claim
-  incrementViews(slug): Promise<void>;
-  deleteExpired(now?): Promise<number>;
-}
-```
+`lib/db/index.ts` selects one repository:
 
-`lib/db/index.ts` picks an implementation:
+1. Use `TINYPASTE_DB_DRIVER` when explicitly set.
+2. Otherwise use Supabase when both its URL and service-role key are present.
+3. Otherwise use memory storage.
 
-1. `TINYPASTE_DB_DRIVER` if set.
-2. Otherwise Supabase when both the URL and service-role key are present.
-3. Otherwise the in-memory store — which **throws** in a production build unless
-   `TINYPASTE_ALLOW_MEMORY_DB=true`, so volatile storage can never become production storage by
-   accident. When it is active, a banner appears on every page.
+Memory storage is cached across development hot reloads and may snapshot to
+`.data/pastes.json`. A production build refuses it unless `TINYPASTE_ALLOW_MEMORY_DB=true`, and
+the UI shows a storage warning while it is active.
 
-The instance is cached on `globalThis` so a hot reload does not discard dev data or leak Supabase
-clients.
+## Database shape
 
-## Data model
+The `pastes` table contains:
 
-One table, `pastes`, with three groups of columns:
-
-| Group | Columns | Who may see them |
+| Category | Representative fields | Exposure |
 | --- | --- | --- |
-| Public metadata | `slug`, `title`, `language`, `created_at`, `updated_at`, `expires_at`, `is_encrypted`, `burn_after_read`, `views`, `content_size` | Anyone with the link |
-| Protected payload | `content`, `encrypted_content`, `encryption_iv`, `encryption_version` | Only after every access check passes |
-| Secrets | `password_hash`, `edit_token_hash` | Never leaves the server |
+| Public metadata | slug, title, language, content type, timestamps, flags, views, size | Included selectively for link holders |
+| Payload | plaintext content or encrypted content + IV + version | Returned only after service policy |
+| Secrets | password hash, edit-token hash | Never returned |
+| Internal identity | UUID primary key | Never returned |
 
-`toMetadata()` in the service is the only function that builds a client-facing projection, and it
-lists fields explicitly rather than deleting them from the row — so a new secret column cannot leak
-by being forgotten. The internal `id` (a UUID) is never exposed; the public identifier is always the
-slug.
+The migrations enforce slug/title shapes, payload exclusivity, encryption/password incompatibility,
+content-type values, document JSON syntax, non-negative size, and valid burn state. Application
+validation remains stricter, especially for the document schema.
 
-Database-level invariants:
+## API surface
 
-- `pastes_payload_shape` — a row holds plaintext or ciphertext, never both.
-- `pastes_encryption_excludes_password` — mirrors the version-1 rule in SQL.
-- `pastes_slug_shape`, `pastes_title_length` — defence in depth behind the Zod schemas.
+These endpoints are internal product APIs, not a versioned public contract.
 
-## Rendering strategy
+| Method | Path | Purpose | Authorisation |
+| --- | --- | --- | --- |
+| `POST` | `/api/pastes` | Create a paste | Same origin + create rate limit |
+| `GET` | `/api/pastes/[slug]` | Metadata/payload when no server secret is needed | Link |
+| `GET` | `/api/pastes/[slug]?edit=1` | Load editable payload | Edit-token header |
+| `POST` | `/api/pastes/[slug]/unlock` | Verify password and return payload | Password + unlock rate limit |
+| `POST` | `/api/pastes/[slug]/reveal` | Atomically consume burn paste | Explicit action |
+| `PATCH` | `/api/pastes/[slug]` | Update editable fields | Edit-token header + mutate rate limit |
+| `DELETE` | `/api/pastes/[slug]` | Delete record | Edit-token header + mutate rate limit |
+| `POST` | `/api/cleanup` | Delete expired rows | Bearer `CLEANUP_SECRET` |
+| `GET` | `/p/[slug]/raw` | Inert source text | Unprotected code/text only |
+| `GET` | `/p/[slug]/download` | Attachment | Unprotected code/text only |
 
-- **Server components** render the paste page shell, metadata and static pages.
-- **Client components** handle the editor, the gates, decryption and all actions.
-- **Syntax highlighting runs in the browser.** Encrypted and password-protected pastes only ever
-  hold plaintext locally, so one client-side `CodeBlock` serves every case rather than maintaining a
-  second, divergent server render path. Unhighlighted text paints immediately and is upgraded when
-  the grammar chunk arrives.
-- **Grammars are loaded one at a time** through an explicit map in `lib/paste/grammars.ts`. A
-  templated dynamic import would pull the whole ~2 MB grammar directory into the build.
-- **Both themes are highlighted at once.** Shiki emits `--shiki-light` and `--shiki-dark` custom
-  properties per token, so switching theme is pure CSS with no re-highlight.
+Edit tokens use `x-tinypaste-edit-token`, not URLs. There is deliberately no listing endpoint.
+
+Successful and failed JSON responses use a consistent shape. Errors expose a closed code and safe
+message; unexpected failures return a request ID rather than a stack trace.
+
+## Rendering and export
+
+- Monaco provides code/plain-text authoring from assets copied to the app's own origin.
+- Shiki grammars are lazy-loaded one language at a time for read-only code rendering.
+- Tiptap provides document authoring, but the reader uses the independent validated schema and React
+  renderer.
+- Code/text raw and download responses are produced on the server with inert headers.
+- Document HTML and Markdown exports are generated locally from validated structure. The server raw
+  and download routes reject document content.
+- Protected content is copied, forked, downloaded, or exported only after it exists in browser
+  memory.
 
 ## Client state
 
-| Concern | Mechanism | Why |
+| Data | Location | Lifetime |
 | --- | --- | --- |
-| Paste history + edit tokens | `localStorage`, read through `useSyncExternalStore` | Survives reloads; the store gives React a stable snapshot and a clean hydration story |
-| Theme | `localStorage` + an inline bootstrap script | The script applies the class before first paint, so there is no flash |
-| Encryption key | `window.location.hash` only | Fragments are never transmitted |
-| Fork seed | A module-level variable | Forked content can be decrypted plaintext, so it must not touch storage, history or a Referer header |
+| Recent entries and edit tokens | `localStorage` | Until forgotten, cleared, or the 200-entry cap evicts old records |
+| Theme preference | `localStorage` | Until site data is cleared |
+| Encryption key | URL fragment / memory | Present only in the complete link and current page |
+| Fork seed | Module memory | Until consumed by the editor or the page reloads |
 
-## API
+Fork state deliberately avoids persistent storage because it may contain decrypted plaintext.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/pastes` | Create. Returns the edit token once |
-| `GET` | `/api/pastes/[slug]` | Metadata + body for pastes needing no server-side secret. `?count=1` counts a view; `?edit=1` with a token returns the body for editing |
-| `POST` | `/api/pastes/[slug]/unlock` | Exchange a password for the body |
-| `POST` | `/api/pastes/[slug]/reveal` | Consume a burn-after-read paste |
-| `PATCH` | `/api/pastes/[slug]` | Edit. Requires the edit token |
-| `DELETE` | `/api/pastes/[slug]` | Delete. Requires the edit token |
-| `POST` | `/api/cleanup` | Remove expired rows. Requires `CLEANUP_SECRET` |
-| `GET` | `/p/[slug]/raw` | Plain text |
-| `GET` | `/p/[slug]/download` | Attachment |
+## Failure model
 
-There is deliberately **no listing endpoint**. Nothing can enumerate pastes, which is why "Recent"
-is a browser-local feature.
-
-Edit tokens travel in the `x-tinypaste-edit-token` header rather than the URL, so they never land in
-browser history, a Referer header, or a server access log.
-
-Errors share one shape:
-
-```json
-{ "error": { "code": "PASTE_EXPIRED", "message": "This paste has expired." } }
-```
-
-Codes come from a closed set in `lib/errors.ts`. Unexpected failures are logged with an operation
-name and a request id and return a generic 500 — never a stack trace.
+- Invalid and unknown slugs look not found.
+- Expired and burned records have explicit states but no payload.
+- Missing encryption keys and failed authentication/decryption are distinct actionable UI states.
+- A storage/configuration failure becomes `STORAGE_UNAVAILABLE`; it does not silently switch a
+  production Supabase deployment to volatile storage.
+- Upstash errors fall back to the per-instance limiter so a rate-limit service outage does not take
+  the application offline.
