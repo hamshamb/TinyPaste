@@ -307,7 +307,7 @@ export function EditPasteForm({ slug }: { slug: string }) {
 
         {/* See paste-editor.tsx's identical wrapper for why this is `absolute
             inset-0` rather than a plain percentage-height child. */}
-        <div className="relative min-h-[42vh] flex-1 sm:min-h-[46vh]">
+        <div className="relative min-h-[clamp(300px,46vh,640px)] flex-1">
           <div className="absolute inset-0">
             {state.meta.contentType === 'document' ? (
               isDocumentReady ? (
@@ -328,6 +328,10 @@ export function EditPasteForm({ slug }: { slug: string }) {
                 onCursorChange={setCursor}
                 onSubmit={() => void save()}
                 className="h-full"
+                variant={state.meta.contentType === 'plaintext' ? 'text' : 'code'}
+                placeholder={
+                  state.meta.contentType === 'plaintext' ? 'Start typing or paste text…' : '// Paste or write code…'
+                }
               />
             )}
           </div>

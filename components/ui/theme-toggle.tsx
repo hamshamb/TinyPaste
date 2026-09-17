@@ -28,7 +28,7 @@ export function ThemeToggle() {
       // infer it from the icon alone.
       aria-label={`${LABELS[preference]}. Activate to change theme.`}
       title={LABELS[preference]}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-text-muted tp-transition hover:bg-surface-muted hover:text-text-base active:scale-95"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-transparent text-text-muted tp-transition hover:bg-surface-muted hover:text-text-base active:scale-95 sm:h-8 sm:w-8"
     >
       <Icon aria-hidden className="h-4 w-4" strokeWidth={1.9} />
     </button>

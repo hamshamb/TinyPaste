@@ -13,12 +13,21 @@ async function toggleBold(page: Page) {
   await page.getByRole('button', { name: 'Bold', exact: true }).click();
 }
 
+/**
+ * Heading levels live one step down from the always-visible toolbar, behind
+ * a single "Heading" control — see components/editor/document-toolbar.tsx.
+ */
+async function setHeading(page: Page, level: 1 | 2 | 3) {
+  await page.getByRole('button', { name: 'Heading', exact: true }).click();
+  await page.getByRole('menuitem', { name: `Heading ${level}`, exact: true }).click();
+}
+
 test.describe('DOCUMENT mode — composing', () => {
   test('creates a formatted document and renders it as a document, not a code block', async ({ page }) => {
     await page.goto('/');
     await switchToDocumentMode(page);
 
-    await page.getByRole('button', { name: 'Heading 1' }).click();
+    await setHeading(page, 1);
     await typeInDocument(page, 'Project Notes');
     await page.keyboard.press('Enter');
     // Enter after a heading starts a fresh paragraph; make it bold text.
@@ -145,7 +154,7 @@ test.describe('DOCUMENT mode — viewing, forking and editing', () => {
   test('forks a document paste with its structure intact', async ({ page }) => {
     await page.goto('/');
     await switchToDocumentMode(page);
-    await page.getByRole('button', { name: 'Heading 1' }).click();
+    await setHeading(page, 1);
     await typeInDocument(page, 'Forkable Heading');
     await page.getByRole('button', { name: 'Create paste' }).click();
     await page.waitForURL(/\/p\/[A-Za-z0-9]+/);
@@ -190,7 +199,7 @@ test.describe('DOCUMENT mode — encryption', () => {
 
     await page.goto('/');
     await switchToDocumentMode(page);
-    await page.getByRole('button', { name: 'Heading 1' }).click();
+    await setHeading(page, 1);
     await typeInDocument(page, SECRET_HEADING);
     await page.getByRole('button', { name: 'Encrypt', exact: true }).click();
     await page.getByRole('button', { name: 'Create paste' }).click();
@@ -203,7 +212,7 @@ test.describe('DOCUMENT mode — encryption', () => {
   test('decrypts and renders a document paste locally', async ({ page }) => {
     await page.goto('/');
     await switchToDocumentMode(page);
-    await page.getByRole('button', { name: 'Heading 1' }).click();
+    await setHeading(page, 1);
     await typeInDocument(page, SECRET_HEADING);
     await page.getByRole('button', { name: 'Encrypt', exact: true }).click();
     await page.getByRole('button', { name: 'Create paste' }).click();

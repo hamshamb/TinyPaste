@@ -171,7 +171,12 @@ export function CommandPalette() {
             aria-label="Search commands"
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-text-subtle"
           />
-          <Kbd className="hidden shrink-0 sm:inline-flex">Esc</Kbd>
+          {/* See header.tsx's identical note: Kbd's base className already
+              hard-codes `inline-flex`, so the responsive override has to live
+              on a wrapping element instead of stacking onto Kbd directly. */}
+          <span className="hidden shrink-0 sm:inline-flex">
+            <Kbd>Esc</Kbd>
+          </span>
         </div>
         <ul className="max-h-[19rem] overflow-y-auto p-1.5">
           {filtered.length === 0 ? (

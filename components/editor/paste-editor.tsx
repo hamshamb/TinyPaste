@@ -388,7 +388,7 @@ export function PasteEditor() {
           this wrapper's own (relatively positioned, flex-grown) box, instead
           of a percentage chain that can catch that first, too-small pass.
         */}
-        <div className="relative min-h-[42vh] flex-1 sm:min-h-[46vh]">
+        <div className="relative min-h-[clamp(300px,46vh,640px)] flex-1">
           <div className="absolute inset-0">
             {mode === 'document' ? (
               <DocumentEditor
@@ -409,19 +409,28 @@ export function PasteEditor() {
                 onCursorChange={setCursor}
                 onSubmit={() => void submit()}
                 className="h-full"
+                variant={mode === 'plaintext' ? 'text' : 'code'}
+                placeholder={mode === 'plaintext' ? 'Start typing or paste text…' : '// Paste or write code…'}
               />
             )}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-t border-border-base px-2 py-1.5 sm:px-2.5">
+        {/*
+          A 2-column grid below `sm`, so four options (Expiration, Password,
+          Burn once, Encrypt) form two tidy rows instead of wrapping one at a
+          time and stranding whichever chip lands alone — Encrypt in
+          particular used to end up on its own row here. `sm:flex` returns to
+          the original single-line layout once there is room for it.
+        */}
+        <div className="grid grid-cols-2 gap-1.5 border-t border-border-base px-2 py-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1 sm:gap-y-1.5 sm:px-2.5">
           <InlineSelect
             label="Expiration"
             icon={Timer}
             value={expiration}
             onChange={(event) => setExpiration(event.target.value)}
             options={EXPIRATION_SELECT_OPTIONS}
-            containerClassName="w-[8.5rem] shrink-0"
+            containerClassName="col-span-2 w-full sm:col-span-auto sm:w-[8.5rem] sm:shrink-0"
           />
 
           <span aria-hidden className="mx-1 hidden h-4 w-px bg-border-base sm:block" />
@@ -436,6 +445,7 @@ export function PasteEditor() {
               onToggle={(next) => (usePassword && !passwordOpen ? setPasswordOpen(true) : toggleUsePassword(next))}
               aria-expanded={usePassword ? passwordOpen : undefined}
               aria-controls={usePassword ? 'password-popover' : undefined}
+              className="w-full justify-center sm:w-auto sm:justify-start"
             />
             {usePassword && passwordOpen ? (
               <div
@@ -480,25 +490,41 @@ export function PasteEditor() {
             tone="warning"
             pressed={burnAfterRead}
             onToggle={setBurnAfterRead}
+            className="w-full justify-center sm:w-auto sm:justify-start"
           />
 
+          {/*
+            Its own full-width row rather than sharing one with Burn once: three
+            options in a 2-column grid always leaves one odd row out, and
+            Encrypt is the one most worth a deliberate, prominent placement
+            instead of a half-empty-looking accident.
+          */}
           <ToggleChip
             icon={ShieldCheck}
             label="Encrypt"
             pressed={encrypt}
             disabled={usePassword}
             onToggle={toggleEncrypt}
-            className={encrypt ? 'ring-1 ring-inset ring-accent-line' : undefined}
+            className={cn(
+              'col-span-2 w-full justify-center sm:col-span-auto sm:w-auto sm:justify-start',
+              encrypt && 'ring-1 ring-inset ring-accent-line',
+            )}
           />
 
           {mode === 'code' && language === 'json' && codeText.trim().length > 0 ? (
-            <Button type="button" variant="ghost" size="sm" onClick={formatJson}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={formatJson}
+              className="col-span-2 w-full justify-center sm:col-span-auto sm:w-auto sm:justify-start"
+            >
               <Braces aria-hidden className="h-3.5 w-3.5" />
               Format
             </Button>
           ) : null}
 
-          <span className="ml-auto flex items-center gap-2 pl-1 pr-1 text-[12px] tabular-nums text-text-subtle">
+          <span className="col-span-2 flex flex-wrap items-center gap-2 pl-1 pr-1 text-[12px] tabular-nums text-text-subtle sm:col-span-auto sm:ml-auto">
             {isMonaco ? (
               <span className="hidden sm:inline">
                 Ln {cursor.line}, Col {cursor.column}
@@ -542,10 +568,10 @@ export function PasteEditor() {
         </p>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* A destructive/reset action never goes icon-only, even on a phone. */}
           <Button type="button" variant="ghost" size="lg" onClick={clear} disabled={submitting}>
             <Eraser aria-hidden className="h-4 w-4" />
-            <span className="hidden sm:inline">Clear</span>
-            <span className="sr-only sm:hidden">Clear the editor</span>
+            Clear
           </Button>
           <span className="hidden items-center gap-1 text-xs text-text-subtle md:flex">
             <Kbd>{modifier}</Kbd>

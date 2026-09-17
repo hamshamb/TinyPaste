@@ -18,6 +18,7 @@ import {
   Link2,
   Loader2,
   Lock,
+  MoreHorizontal,
   Pencil,
   QrCode as QrIcon,
   ShieldCheck,
@@ -351,14 +352,23 @@ export function PasteScreen({ meta: initialMeta, initialBody, gate, created }: P
         <BurnGate slug={meta.slug} isCreator={created || editToken !== null} onRevealed={onGateResolved} />
       ) : (
         <>
+          {/*
+            Icon-only chrome below `sm`, so six-plus actions fit one row on a
+            360px phone instead of wrapping — each button still carries its
+            own aria-label, so the accessible name never depends on the
+            visible text the way the old mobile "Clear" button's did. Copy
+            link and QR are common enough to earn permanent desktop space but
+            not mobile's: they move into the "More" menu there instead of
+            competing with Copy/Export/Fork/Edit/Delete for room.
+          */}
           <div className="mb-2 flex flex-wrap items-center gap-1">
-            <Button size="sm" onClick={copyContent} disabled={plaintext === null}>
+            <Button size="sm" onClick={copyContent} disabled={plaintext === null} aria-label={copied ? 'Copied' : 'Copy'}>
               {copied ? (
                 <Check aria-hidden className="h-3.5 w-3.5 text-success" />
               ) : (
                 <Copy aria-hidden className="h-3.5 w-3.5" />
               )}
-              {copied ? 'Copied' : 'Copy'}
+              <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
             </Button>
 
             {isDocument ? (
@@ -369,9 +379,9 @@ export function PasteScreen({ meta: initialMeta, initialBody, gate, created }: P
             ) : (
               <>
                 {serverExportable ? (
-                  <LinkButton size="sm" variant="ghost" href={`/p/${meta.slug}/raw`}>
+                  <LinkButton size="sm" variant="ghost" href={`/p/${meta.slug}/raw`} aria-label="Raw">
                     <FileText aria-hidden className="h-3.5 w-3.5" />
-                    Raw
+                    <span className="hidden sm:inline">Raw</span>
                   </LinkButton>
                 ) : (
                   <Button
@@ -379,66 +389,72 @@ export function PasteScreen({ meta: initialMeta, initialBody, gate, created }: P
                     variant="ghost"
                     onClick={() => setRawView((raw) => !raw)}
                     aria-pressed={rawView}
+                    aria-label={rawView ? 'Highlighted' : 'Raw'}
                     disabled={plaintext === null}
                   >
                     <FileText aria-hidden className="h-3.5 w-3.5" />
-                    {rawView ? 'Highlighted' : 'Raw'}
+                    <span className="hidden sm:inline">{rawView ? 'Highlighted' : 'Raw'}</span>
                   </Button>
                 )}
 
                 {serverExportable ? (
-                  <LinkButton size="sm" variant="ghost" href={`/p/${meta.slug}/download`}>
+                  <LinkButton size="sm" variant="ghost" href={`/p/${meta.slug}/download`} aria-label="Download">
                     <Download aria-hidden className="h-3.5 w-3.5" />
-                    Download
+                    <span className="hidden sm:inline">Download</span>
                   </LinkButton>
                 ) : (
-                  <Button size="sm" variant="ghost" onClick={download} disabled={plaintext === null}>
+                  <Button size="sm" variant="ghost" onClick={download} disabled={plaintext === null} aria-label="Download">
                     <Download aria-hidden className="h-3.5 w-3.5" />
-                    Download
+                    <span className="hidden sm:inline">Download</span>
                   </Button>
                 )}
               </>
             )}
 
-            <Button size="sm" variant="ghost" onClick={fork} disabled={plaintext === null}>
+            <Button size="sm" variant="ghost" onClick={fork} disabled={plaintext === null} aria-label="Fork">
               <GitFork aria-hidden className="h-3.5 w-3.5" />
-              Fork
+              <span className="hidden sm:inline">Fork</span>
             </Button>
 
-            <span aria-hidden className="mx-0.5 hidden h-4 w-px bg-border-base sm:block" />
+            <div className="hidden items-center gap-1 sm:flex">
+              <span aria-hidden className="mx-0.5 h-4 w-px bg-border-base" />
+              <Button size="sm" variant="ghost" onClick={copyLink}>
+                <Link2 aria-hidden className="h-3.5 w-3.5" />
+                Copy link
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowQr((open) => !open)}
+                aria-expanded={showQr}
+                aria-controls="paste-qr"
+              >
+                <QrIcon aria-hidden className="h-3.5 w-3.5" />
+                QR
+              </Button>
+            </div>
 
-            <Button size="sm" variant="ghost" onClick={copyLink}>
-              <Link2 aria-hidden className="h-3.5 w-3.5" />
-              Copy link
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowQr((open) => !open)}
-              aria-expanded={showQr}
-              aria-controls="paste-qr"
-            >
-              <QrIcon aria-hidden className="h-3.5 w-3.5" />
-              QR
-            </Button>
+            <div className="sm:hidden">
+              <MoreActionsMenu onCopyLink={copyLink} onToggleQr={() => setShowQr((open) => !open)} qrOpen={showQr} />
+            </div>
 
             {editToken ? (
               <span className="ml-auto flex items-center gap-1">
                 {!meta.burnAfterRead ? (
-                  <LinkButton size="sm" variant="ghost" href={editHref}>
+                  <LinkButton size="sm" variant="ghost" href={editHref} aria-label="Edit">
                     <Pencil aria-hidden className="h-3.5 w-3.5" />
-                    Edit
+                    <span className="hidden sm:inline">Edit</span>
                   </LinkButton>
                 ) : null}
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setDeleteOpen(true)}
+                  aria-label="Delete"
                   className="text-danger hover:bg-danger-soft hover:text-danger"
                 >
                   <Trash2 aria-hidden className="h-3.5 w-3.5" />
-                  Delete
+                  <span className="hidden sm:inline">Delete</span>
                 </Button>
               </span>
             ) : null}
@@ -452,7 +468,9 @@ export function PasteScreen({ meta: initialMeta, initialBody, gate, created }: P
             {isDocument ? (
               documentResult ? (
                 'doc' in documentResult ? (
-                  <DocumentRenderer doc={documentResult.doc} />
+                  // A reading measure, not the full editor width: prose reads
+                  // worse edge-to-edge than code does.
+                  <DocumentRenderer doc={documentResult.doc} className="mx-auto max-w-[74ch]" />
                 ) : (
                   <DecryptStatus state="invalid-document" />
                 )
@@ -516,11 +534,12 @@ function ExportMenu({ disabled, onExport }: { disabled: boolean; onExport: (form
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label="Export"
         disabled={disabled}
       >
         <Download aria-hidden className="h-3.5 w-3.5" />
-        Export
-        <ChevronDown aria-hidden className="h-3 w-3" />
+        <span className="hidden sm:inline">Export</span>
+        <ChevronDown aria-hidden className="hidden h-3 w-3 sm:inline" />
       </Button>
       {open ? (
         <div
@@ -548,6 +567,68 @@ function ExportMenu({ disabled, onExport }: { disabled: boolean; onExport: (form
               {label}
             </button>
           ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Copy link and QR are common but not primary — this is where they live on a phone. */
+function MoreActionsMenu({
+  onCopyLink,
+  onToggleQr,
+  qrOpen,
+}: {
+  onCopyLink: () => void;
+  onToggleQr: () => void;
+  qrOpen: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener('mousedown', onPointerDown);
+    return () => window.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" aria-label="More actions">
+        <MoreHorizontal aria-hidden className="h-3.5 w-3.5" />
+      </Button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1.5 w-44 overflow-hidden rounded-lg border border-border-base bg-surface py-1 tp-shadow-pop tp-pop"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onCopyLink();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-text-muted tp-transition hover:bg-surface-muted hover:text-text-base"
+          >
+            <Link2 aria-hidden className="h-3.5 w-3.5" />
+            Copy link
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onToggleQr();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-text-muted tp-transition hover:bg-surface-muted hover:text-text-base"
+          >
+            <QrIcon aria-hidden className="h-3.5 w-3.5" />
+            {qrOpen ? 'Hide QR code' : 'Show QR code'}
+          </button>
         </div>
       ) : null}
     </div>

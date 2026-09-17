@@ -186,7 +186,7 @@ test.describe('recent pastes', () => {
     const stranger = await context.browser()!.newContext();
     const strangerPage = await stranger.newPage();
     await strangerPage.goto('/recent');
-    await expect(strangerPage.getByText('No pastes from this browser yet.')).toBeVisible();
+    await expect(strangerPage.getByText('No recent pastes')).toBeVisible();
     await stranger.close();
   });
 

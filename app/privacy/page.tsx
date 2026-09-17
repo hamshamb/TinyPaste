@@ -9,8 +9,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <article className="mx-auto w-full max-w-[700px] px-4 py-12 sm:px-6 sm:py-16">
-      <p className="text-xs font-medium uppercase tracking-[0.1em] text-text-subtle">Privacy</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">What is stored, and what is not</h1>
+      <h1 className="text-[28px] font-semibold tracking-[-0.025em]">What is stored, and what is not</h1>
       <p className="mt-4 text-[15px] leading-[1.7] text-text-muted">
         Plain English, and only claims the code actually backs up.
       </p>
@@ -108,8 +107,8 @@ export default function PrivacyPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-10 border-t border-border-base pt-6">
-      <h2 className="text-[15px] font-semibold">{title}</h2>
+    <section className="mt-12">
+      <h2 className="text-[17px] font-semibold tracking-[-0.01em]">{title}</h2>
       <div className="mt-3 space-y-3 text-[15px] leading-[1.7] text-text-muted">{children}</div>
     </section>
   );
