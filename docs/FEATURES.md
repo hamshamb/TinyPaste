@@ -3,7 +3,7 @@
 This is the user-visible capability matrix for TinyPaste.
 
 **Status:** ✅ implemented and covered · ◐ implemented with an operational or testing limitation ·
-— intentionally unsupported · ◌ planned.
+No: intentionally unsupported · ◌ planned.
 
 ## Authoring
 
@@ -40,8 +40,8 @@ are validated in the browser before encryption and again after decryption.
 | Password protection | ✅ | bcrypt cost 12; unlock attempts are rate limited |
 | Burn after reading | ✅ | Explicit reveal; one atomic winner; payload wiped on consumption |
 | Browser encryption | ✅ | AES-256-GCM; key lives in the URL fragment |
-| Password + browser encryption | — | Mutually exclusive in the current storage format |
-| Edit a burn paste | — | Disallowed because its payload is designed to disappear |
+| Password + browser encryption | No | Mutually exclusive in the current storage format |
+| Edit a burn paste | No | Disallowed because its payload is designed to disappear |
 
 Creating a burn paste does not consume it. The creator first sees a warning; a reader must choose
 **Reveal and destroy**. Raw and download routes refuse burn pastes rather than consuming them.
@@ -72,8 +72,8 @@ Creating a burn paste does not consume it. The creator first sees a warning; a r
 | Edit token | ✅ | 256 random bits; returned once; SHA-256 digest stored server-side |
 | Edit | ✅ | Title, content, language where applicable, and renewed expiration |
 | Edit encrypted content | ✅ | Decrypts and re-encrypts locally with the fragment key |
-| Change content type after creation | — | Fixed to prevent reinterpretation of stored bytes |
-| Change security mode after creation | — | Fixed to prevent downgrade and recovery ambiguity |
+| Change content type after creation | No | Fixed to prevent reinterpretation of stored bytes |
+| Change security mode after creation | No | Fixed to prevent downgrade and recovery ambiguity |
 | Delete | ✅ | Confirmation plus server-side edit-token verification |
 | Delete expired/burned record | ✅ | Owner deletion bypasses read state but never token verification |
 | Recent pastes | ✅ | Maximum 200 entries in the current browser's local storage |

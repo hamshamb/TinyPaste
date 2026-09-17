@@ -34,7 +34,7 @@ In project settings, copy:
 | Service-role/secret key | `SUPABASE_SERVICE_ROLE_KEY` | **Secret; bypasses RLS** |
 
 Supabase dashboard labels can vary between legacy and newer key formats. Use the key documented as
-server-side/secret/service-role—not a publishable key—for `SUPABASE_SERVICE_ROLE_KEY`.
+server-side/secret/service-role, not a publishable key, for `SUPABASE_SERVICE_ROLE_KEY`.
 
 Never:
 
@@ -67,9 +67,9 @@ Restart the development server after changing environment variables.
 
 Apply every SQL file in `supabase/migrations/` in filename order:
 
-1. `0001_init.sql` — base table, indexes, constraints, RLS, privileges, atomic burn, view counter,
+1. `0001_init.sql`: base table, indexes, constraints, RLS, privileges, atomic burn, view counter,
    and cleanup function.
-2. `0002_content_types.sql` — code/plain-text/document discriminator, legacy backfill, and document
+2. `0002_content_types.sql`: code/plain-text/document discriminator, legacy backfill, and document
    JSON syntax constraint.
 
 ### Option A: dashboard SQL Editor
@@ -206,7 +206,7 @@ curl -i "https://YOUR_PROJECT_REF.supabase.co/rest/v1/pastes?select=*" \
   -H "apikey: YOUR_ANON_OR_PUBLISHABLE_KEY"
 ```
 
-An empty result or permission error is acceptable. Returned paste rows are not—stop deployment and
+An empty result or permission error is acceptable. Returned paste rows are not; stop deployment and
 reapply/review the RLS and privilege block in `0001_init.sql`.
 
 ## 8. Start TinyPaste

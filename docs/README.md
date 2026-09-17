@@ -47,6 +47,6 @@ corresponding source and this documentation together:
 
 - Paths and commands are written from the repository root.
 - “Browser encryption” means client-side AES-GCM with a fragment-held key.
-- “Document” means the closed, validated Tiptap/ProseMirror JSON format—not arbitrary HTML.
+- “Document” means the closed, validated Tiptap/ProseMirror JSON format, not arbitrary HTML.
 - “Owner” means a browser holding the paste's edit token; TinyPaste has no user accounts.
 - “Public” means reachable by link. It does not mean listed or indexed.

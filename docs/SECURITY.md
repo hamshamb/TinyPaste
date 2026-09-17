@@ -136,7 +136,7 @@ the raw token once. The browser keeps it with local history and transmits it in 
 
 A plain digest is appropriate because this token has 256 bits of machine-generated entropy; a slow
 password KDF would add cost without addressing a plausible dictionary attack. Verification uses a
-constant-time comparison. Client-side possession only controls whether owner UI appears—the server
+constant-time comparison. Client-side possession only controls whether owner UI appears; the server
 authorises every mutation independently.
 
 Clearing site storage destroys ownership capability. There is no account or server-side recovery.
