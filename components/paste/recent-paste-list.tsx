@@ -50,15 +50,14 @@ export function RecentPasteList() {
 
   if (entries.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border-base px-6 py-16 text-center">
-        <p className="text-sm font-medium">No pastes from this browser yet.</p>
-        <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-text-muted">
-          Pastes you create are remembered here, on this device only. Clearing site data removes them along
-          with their edit tokens.
+      <div className="py-10">
+        <p className="text-sm font-medium">No recent pastes</p>
+        <p className="mt-1 max-w-sm text-[13px] text-text-muted">
+          Pastes you create on this device will appear here. Recent history stays in this browser.
         </p>
         <Link
           href="/"
-          className="mt-6 inline-flex h-9 items-center rounded-md border border-border-base bg-surface px-3.5 text-[13px] font-medium tp-transition hover:border-border-strong hover:bg-surface-muted"
+          className="mt-4 inline-flex h-8 items-center rounded-md border border-border-base bg-surface px-3 text-[13px] font-medium tp-transition hover:border-border-strong hover:bg-surface-muted"
         >
           Create a paste
         </Link>

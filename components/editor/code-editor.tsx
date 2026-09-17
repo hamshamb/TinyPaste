@@ -5,6 +5,7 @@ import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import type { editor as MonacoEditorNs } from 'monaco-editor';
 import { ensureMonacoEnvironment } from '@/lib/client/monaco-setup';
 import { toMonacoLanguage } from '@/lib/paste/monaco-language-map';
+import { cn } from '@/lib/utils/cn';
 
 /**
  * Configured at module scope, not inside an effect: React runs a child's
@@ -90,6 +91,15 @@ export type CodeEditorProps = {
   /** Ctrl/Cmd+Enter is the app's own "create/save" shortcut, not Monaco's. */
   onSubmit?: () => void;
   className?: string;
+  /**
+   * 'code' is a developer editor: gutter, bracket/indent chrome, a monospace
+   * measure that uses the full width. 'text' is the same Monaco instance —
+   * still fast, still keyboard-first — with that chrome dialled back so a
+   * plain-text paste doesn't read as "code with highlighting turned off".
+   */
+  variant?: 'code' | 'text';
+  /** Shown only while `value` is empty, the same way a <textarea> placeholder works. */
+  placeholder?: string;
 };
 
 /**
@@ -115,15 +125,23 @@ export function CodeEditor({
   onCursorChange,
   onSubmit,
   className,
+  variant = 'code',
+  placeholder,
 }: CodeEditorProps) {
   const editorRef = useRef<MonacoEditorNs.IStandaloneCodeEditor | null>(null);
+  const isText = variant === 'text';
 
   // Options that can change after mount are pushed imperatively — passing a
   // fresh `options` object every render would otherwise fight Monaco's own
   // internal option diffing on every keystroke.
   useEffect(() => {
-    editorRef.current?.updateOptions({ wordWrap: wordWrap ? 'on' : 'off', minimap: { enabled: minimap } });
-  }, [wordWrap, minimap]);
+    editorRef.current?.updateOptions({
+      // Plain text reads as prose, not as code with highlighting turned off:
+      // it wraps by default and drops the gutter/indent chrome code needs.
+      wordWrap: wordWrap || isText ? 'on' : 'off',
+      minimap: { enabled: minimap },
+    });
+  }, [wordWrap, minimap, isText]);
 
   const handleMount = useCallback<OnMount>(
     (editorInstance, monaco) => {
@@ -146,48 +164,77 @@ export function CodeEditor({
   );
 
   return (
-    <Editor
-      value={value}
-      onChange={(next) => onChange(next ?? '')}
-      language={toMonacoLanguage(language)}
-      theme={theme === 'dark' ? 'tinypaste-dark' : 'tinypaste-light'}
-      beforeMount={defineThemes}
-      onMount={handleMount}
-      className={className}
-      loading={<div className="flex h-full items-center justify-center text-sm text-text-subtle">Loading editor…</div>}
-      options={{
-        readOnly,
-        automaticLayout: true,
-        minimap: { enabled: minimap },
-        wordWrap: wordWrap ? 'on' : 'off',
-        fontSize: 13,
-        lineHeight: 22,
-        fontFamily:
-          "ui-monospace, 'SF Mono', 'SFMono-Regular', 'JetBrains Mono', 'Cascadia Code', 'Cascadia Mono', 'Fira Code', 'Roboto Mono', Menlo, Consolas, 'Liberation Mono', monospace",
-        fontLigatures: false,
-        tabSize: 2,
-        insertSpaces: true,
-        // Every one of these is a genuine Monaco default already; listed
-        // explicitly so the requirement they satisfy is traceable at a glance.
-        lineNumbers: 'on',
-        matchBrackets: 'always',
-        autoIndent: 'full',
-        autoClosingBrackets: 'languageDefined',
-        autoClosingQuotes: 'languageDefined',
-        renderLineHighlight: 'all',
-        selectionHighlight: true,
-        occurrencesHighlight: 'singleFile',
-        multiCursorModifier: 'alt',
-        find: { addExtraSpaceOnTop: false },
-        scrollBeyondLastLine: false,
-        smoothScrolling: true,
-        cursorBlinking: 'smooth',
-        padding: { top: 14, bottom: 14 },
-        overviewRulerLanes: 0,
-        hideCursorInOverviewRuler: true,
-        renderWhitespace: 'selection',
-        scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
-      }}
-    />
+    <div className="relative h-full">
+      {/*
+        Monaco has no native placeholder — this mirrors the textarea
+        convention by hand, and disappears the moment there is real content.
+        Positioning approximates the editor's own padding/gutter per variant
+        rather than measuring it exactly; it only has to hold still long
+        enough to read as a hint before the first keystroke replaces it.
+      */}
+      {placeholder && value.length === 0 ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute z-10 select-none text-[13px] text-text-subtle"
+          style={{ top: 14, left: isText ? 20 : 54 }}
+        >
+          {placeholder}
+        </span>
+      ) : null}
+      <div className={cn('h-full', isText && 'mx-auto max-w-[76ch]')}>
+        <Editor
+          value={value}
+          onChange={(next) => onChange(next ?? '')}
+          language={toMonacoLanguage(language)}
+          theme={theme === 'dark' ? 'tinypaste-dark' : 'tinypaste-light'}
+          beforeMount={defineThemes}
+          onMount={handleMount}
+          className={className}
+          loading={
+            <div className="flex h-full items-center justify-center text-sm text-text-subtle">Loading editor…</div>
+          }
+          options={{
+            readOnly,
+            automaticLayout: true,
+            minimap: { enabled: minimap },
+            wordWrap: wordWrap || isText ? 'on' : 'off',
+            fontSize: isText ? 14.5 : 13,
+            lineHeight: isText ? 26 : 22,
+            fontFamily:
+              "ui-monospace, 'SF Mono', 'SFMono-Regular', 'JetBrains Mono', 'Cascadia Code', 'Cascadia Mono', 'Fira Code', 'Roboto Mono', Menlo, Consolas, 'Liberation Mono', monospace",
+            fontLigatures: false,
+            tabSize: 2,
+            insertSpaces: true,
+            // Every one of these is a genuine Monaco default already; listed
+            // explicitly so the requirement they satisfy is traceable at a glance.
+            lineNumbers: isText ? 'off' : 'on',
+            matchBrackets: isText ? 'never' : 'always',
+            autoIndent: 'full',
+            autoClosingBrackets: isText ? 'never' : 'languageDefined',
+            autoClosingQuotes: isText ? 'never' : 'languageDefined',
+            renderLineHighlight: isText ? 'none' : 'all',
+            selectionHighlight: !isText,
+            occurrencesHighlight: isText ? 'off' : 'singleFile',
+            // Plain text drops the gutter and indent chrome entirely — a
+            // writing surface, not "code with highlighting turned off".
+            glyphMargin: false,
+            folding: !isText,
+            lineDecorationsWidth: isText ? 0 : 10,
+            lineNumbersMinChars: isText ? 0 : 4,
+            guides: { indentation: !isText },
+            multiCursorModifier: 'alt',
+            find: { addExtraSpaceOnTop: false },
+            scrollBeyondLastLine: false,
+            smoothScrolling: true,
+            cursorBlinking: 'smooth',
+            padding: { top: isText ? 20 : 14, bottom: isText ? 20 : 14 },
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            renderWhitespace: 'selection',
+            scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+          }}
+        />
+      </div>
+    </div>
   );
 }

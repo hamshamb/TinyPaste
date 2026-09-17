@@ -17,8 +17,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <article className="mx-auto w-full max-w-[700px] px-4 py-12 sm:px-6 sm:py-16">
-      <p className="text-xs font-medium uppercase tracking-[0.1em] text-text-subtle">About</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">{site.name}</h1>
+      <h1 className="text-[28px] font-semibold tracking-[-0.025em]">About {site.name}</h1>
       <p className="mt-4 text-[15px] leading-[1.7] text-text-muted">
         {site.name} is a place to put text somewhere another person can read it, and nothing more. Paste code,
         a log, a config file or a note, choose how long it should live, and share the link. No account, no
@@ -99,8 +98,8 @@ export default function AboutPage() {
 
 function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="mt-10 scroll-mt-20 border-t border-border-base pt-6">
-      <h2 className="text-[15px] font-semibold">{title}</h2>
+    <section id={id} className="mt-12 scroll-mt-20">
+      <h2 className="text-[17px] font-semibold tracking-[-0.01em]">{title}</h2>
       <div className="mt-3 space-y-3 text-[15px] leading-[1.7] text-text-muted">{children}</div>
     </section>
   );

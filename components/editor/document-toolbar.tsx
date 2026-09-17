@@ -10,7 +10,9 @@ import {
   AlignRight,
   Baseline,
   Bold,
+  ChevronDown,
   Code,
+  Heading,
   Heading1,
   Heading2,
   Heading3,
@@ -19,7 +21,9 @@ import {
   Link2,
   List,
   ListOrdered,
+  MoreHorizontal,
   Minus,
+  Pilcrow,
   Quote,
   Redo2,
   SquareCode,
@@ -260,12 +264,260 @@ function ColorPopover({
   );
 }
 
+const HEADING_LEVELS = [1, 2, 3] as const;
+const HEADING_ICON: Record<1 | 2 | 3, LucideIcon> = { 1: Heading1, 2: Heading2, 3: Heading3 };
+
+/**
+ * One primary control for "Heading", covering every level plus Paragraph —
+ * the toolbar hierarchy calls for a single always-visible heading control,
+ * with the specific levels one step down rather than three separate icons
+ * competing with Bold/Italic/Underline for primary space.
+ */
+function HeadingMenu({
+  editor,
+  activeLevel,
+}: {
+  editor: Editor;
+  activeLevel: 1 | 2 | 3 | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  const TriggerIcon = activeLevel ? HEADING_ICON[activeLevel] : Heading;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-label="Heading"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="Heading"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'inline-flex h-7 shrink-0 items-center gap-0.5 rounded-md px-1 tp-transition',
+          activeLevel ? 'bg-accent-soft text-accent' : 'text-text-muted hover:bg-surface-muted hover:text-text-base',
+        )}
+      >
+        <TriggerIcon aria-hidden className="h-[15px] w-[15px]" strokeWidth={2} />
+        <ChevronDown aria-hidden className="h-3 w-3" strokeWidth={2} />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-30 mt-2 w-40 overflow-hidden rounded-lg border border-border-base bg-surface py-1 tp-shadow-pop tp-pop"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              editor.chain().focus().setParagraph().run();
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] tp-transition hover:bg-surface-muted',
+              !activeLevel ? 'text-accent' : 'text-text-muted hover:text-text-base',
+            )}
+          >
+            <Pilcrow aria-hidden className="h-3.5 w-3.5" strokeWidth={1.9} />
+            Paragraph
+          </button>
+          {HEADING_LEVELS.map((level) => {
+            const Icon = HEADING_ICON[level];
+            return (
+              <button
+                key={level}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  editor.chain().focus().toggleHeading({ level }).run();
+                  setOpen(false);
+                }}
+                className={cn(
+                  'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] tp-transition hover:bg-surface-muted',
+                  activeLevel === level ? 'text-accent' : 'text-text-muted hover:text-text-base',
+                )}
+              >
+                <Icon aria-hidden className="h-3.5 w-3.5" strokeWidth={1.9} />
+                Heading {level}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Everything that isn't primary formatting, one popover deep — this is what
+ * keeps the always-visible bar to seven controls instead of twenty. Grouped
+ * by kind (marks, alignment, colour, structure) rather than dumped in one
+ * flat list, so it stays a menu you can scan rather than a second toolbar.
+ */
+function OverflowMenu({
+  editor,
+  state,
+}: {
+  editor: Editor;
+  state: {
+    strike: boolean;
+    code: boolean;
+    blockquote: boolean;
+    codeBlock: boolean;
+    textStyle: boolean;
+    highlight: boolean;
+    alignLeft: boolean;
+    alignCenter: boolean;
+    alignRight: boolean;
+    alignJustify: boolean;
+  };
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  // Every action here closes the menu afterward, same as the Heading menu
+  // and the colour/link popovers — a menu that stays open after a choice
+  // reads as broken, not as an invitation to pick a second one.
+  const run = (fn: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => {
+    fn(editor.chain().focus()).run();
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-label="More formatting"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="More formatting"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md tp-transition',
+          open ? 'bg-surface-muted text-text-base' : 'text-text-muted hover:bg-surface-muted hover:text-text-base',
+        )}
+      >
+        <MoreHorizontal aria-hidden className="h-[15px] w-[15px]" strokeWidth={2} />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-2 w-56 rounded-lg border border-border-base bg-surface p-1.5 tp-shadow-pop tp-pop sm:left-0 sm:right-auto"
+        >
+          <MenuAction icon={Strikethrough} label="Strikethrough" active={state.strike} onClick={() => run((c) => c.toggleStrike())} />
+          <MenuAction icon={Quote} label="Quote" active={state.blockquote} onClick={() => run((c) => c.toggleBlockquote())} />
+          <MenuAction icon={Code} label="Inline code" active={state.code} onClick={() => run((c) => c.toggleCode())} />
+          <MenuAction icon={SquareCode} label="Code block" active={state.codeBlock} onClick={() => run((c) => c.toggleCodeBlock())} />
+          <MenuAction icon={Minus} label="Horizontal rule" onClick={() => run((c) => c.setHorizontalRule())} />
+
+          <div className="my-1 h-px bg-border-base" />
+
+          <div className="flex items-center gap-0.5 px-1 py-1">
+            <ToolbarButton icon={AlignLeft} label="Align left" active={state.alignLeft} onClick={() => run((c) => c.setTextAlign('left'))} />
+            <ToolbarButton icon={AlignCenter} label="Align centre" active={state.alignCenter} onClick={() => run((c) => c.setTextAlign('center'))} />
+            <ToolbarButton icon={AlignRight} label="Align right" active={state.alignRight} onClick={() => run((c) => c.setTextAlign('right'))} />
+            <ToolbarButton icon={AlignJustify} label="Justify" active={state.alignJustify} onClick={() => run((c) => c.setTextAlign('justify'))} />
+          </div>
+
+          <div className="my-1 h-px bg-border-base" />
+
+          <div className="flex items-center gap-1 px-2 py-1">
+            <ColorPopover
+              editor={editor}
+              icon={Baseline}
+              label="Text colour"
+              nativeInputLabel="Custom text colour"
+              presets={TEXT_COLORS}
+              isActive={state.textStyle}
+              apply={(color) => editor.chain().focus().setColor(color).run()}
+              clear={() => editor.chain().focus().unsetColor().run()}
+            />
+            <span className="text-[13px] text-text-muted">Text colour</span>
+          </div>
+          <div className="flex items-center gap-1 px-2 py-1">
+            <ColorPopover
+              editor={editor}
+              icon={Highlighter}
+              label="Highlight colour"
+              nativeInputLabel="Custom highlight colour"
+              presets={HIGHLIGHT_COLORS}
+              isActive={state.highlight}
+              apply={(color) => editor.chain().focus().toggleHighlight({ color }).run()}
+              clear={() => editor.chain().focus().unsetHighlight().run()}
+            />
+            <span className="text-[13px] text-text-muted">Highlight colour</span>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuAction({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] tp-transition',
+        active ? 'text-accent' : 'text-text-muted hover:bg-surface-muted hover:text-text-base',
+      )}
+    >
+      <Icon aria-hidden className="h-3.5 w-3.5" strokeWidth={1.9} />
+      {label}
+    </button>
+  );
+}
+
 /**
  * Compact formatting toolbar for DOCUMENT mode.
  *
  * Reads live state through useEditorState rather than editor.isActive()
  * inline, so a selection change re-renders this bar without re-rendering the
  * (much heavier) editor surface it sits above.
+ *
+ * Organised around hierarchy rather than a flat list of ~20 equal-weight
+ * icons: Bold/Italic/Underline/Heading/lists/Link stay always visible, one
+ * "More" popover holds secondary formatting (strikethrough, quote, code,
+ * alignment, colour, rule), and Undo/Redo stay pinned together on the right
+ * regardless of how much the primary group needs. The primary group plus
+ * Undo/Redo is sized to fit a 360px phone on one `flex-nowrap` row —
+ * deliberately not `overflow-x-auto`, which would clip every popover here
+ * (Link, Heading, More, the two colour pickers) along with the horizontal
+ * scroll it exists to add.
  */
 export function DocumentToolbar({ editor }: { editor: Editor | null }) {
   const state = useEditorState({
@@ -303,8 +555,10 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
   const run = (fn: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) =>
     fn(editor.chain().focus()).run();
 
+  const activeLevel = state.h1 ? 1 : state.h2 ? 2 : state.h3 ? 3 : null;
+
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-border-base px-2 py-1.5">
+    <div className="flex flex-nowrap items-center gap-0.5 border-b border-border-base px-2 py-1.5">
       <ToolbarButton icon={Bold} label="Bold" active={state.bold} onClick={() => run((c) => c.toggleBold())} />
       <ToolbarButton icon={Italic} label="Italic" active={state.italic} onClick={() => run((c) => c.toggleItalic())} />
       <ToolbarButton
@@ -313,18 +567,10 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
         active={state.underline}
         onClick={() => run((c) => c.toggleUnderline())}
       />
-      <ToolbarButton
-        icon={Strikethrough}
-        label="Strikethrough"
-        active={state.strike}
-        onClick={() => run((c) => c.toggleStrike())}
-      />
 
       <Separator />
 
-      <HeadingButton editor={editor} level={1} active={state.h1} />
-      <HeadingButton editor={editor} level={2} active={state.h2} />
-      <HeadingButton editor={editor} level={3} active={state.h3} />
+      <HeadingMenu editor={editor} activeLevel={activeLevel} />
 
       <Separator />
 
@@ -343,91 +589,16 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
 
       <Separator />
 
-      <ToolbarButton
-        icon={Quote}
-        label="Quote"
-        active={state.blockquote}
-        onClick={() => run((c) => c.toggleBlockquote())}
-      />
-      <ToolbarButton icon={Code} label="Inline code" active={state.code} onClick={() => run((c) => c.toggleCode())} />
-      <ToolbarButton
-        icon={SquareCode}
-        label="Code block"
-        active={state.codeBlock}
-        onClick={() => run((c) => c.toggleCodeBlock())}
-      />
-
-      <Separator />
-
       <LinkPopover editor={editor} />
-      <ColorPopover
-        editor={editor}
-        icon={Baseline}
-        label="Text colour"
-        nativeInputLabel="Custom text colour"
-        presets={TEXT_COLORS}
-        isActive={state.textStyle}
-        apply={(color) => editor.chain().focus().setColor(color).run()}
-        clear={() => editor.chain().focus().unsetColor().run()}
-      />
-      <ColorPopover
-        editor={editor}
-        icon={Highlighter}
-        label="Highlight colour"
-        nativeInputLabel="Custom highlight colour"
-        presets={HIGHLIGHT_COLORS}
-        isActive={state.highlight}
-        apply={(color) => editor.chain().focus().toggleHighlight({ color }).run()}
-        clear={() => editor.chain().focus().unsetHighlight().run()}
-      />
 
       <Separator />
 
-      <ToolbarButton
-        icon={AlignLeft}
-        label="Align left"
-        active={state.alignLeft}
-        onClick={() => run((c) => c.setTextAlign('left'))}
-      />
-      <ToolbarButton
-        icon={AlignCenter}
-        label="Align centre"
-        active={state.alignCenter}
-        onClick={() => run((c) => c.setTextAlign('center'))}
-      />
-      <ToolbarButton
-        icon={AlignRight}
-        label="Align right"
-        active={state.alignRight}
-        onClick={() => run((c) => c.setTextAlign('right'))}
-      />
-      <ToolbarButton
-        icon={AlignJustify}
-        label="Justify"
-        active={state.alignJustify}
-        onClick={() => run((c) => c.setTextAlign('justify'))}
-      />
+      <OverflowMenu editor={editor} state={state} />
 
-      <Separator />
-
-      <ToolbarButton icon={Minus} label="Horizontal rule" onClick={() => run((c) => c.setHorizontalRule())} />
-
-      <span className="ml-auto flex items-center gap-0.5">
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 pl-1">
         <ToolbarButton icon={Undo2} label="Undo" disabled={!state.canUndo} onClick={() => editor.chain().focus().undo().run()} />
         <ToolbarButton icon={Redo2} label="Redo" disabled={!state.canRedo} onClick={() => editor.chain().focus().redo().run()} />
       </span>
     </div>
-  );
-}
-
-function HeadingButton({ editor, level, active }: { editor: Editor; level: 1 | 2 | 3; active: boolean }) {
-  const Icon = level === 1 ? Heading1 : level === 2 ? Heading2 : Heading3;
-  return (
-    <ToolbarButton
-      icon={Icon}
-      label={`Heading ${level}`}
-      active={active}
-      onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
-    />
   );
 }
